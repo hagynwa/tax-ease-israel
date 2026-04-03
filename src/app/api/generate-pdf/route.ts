@@ -23,8 +23,11 @@ const FORM_MAP: Record<number, string> = {
  */
 const COORDS_2024 = {
   // Identity Block (Page 1)
-  idNumber: { page: 0, x: 460, y: 645 },  // Box 'מספר זהות'
+  idNumber: { page: 0, x: 440, y: 645 },  // Box 'מספר זהות'
+  firstName: { page: 0, x: 300, y: 605 },
+  lastName: { page: 0, x: 450, y: 605 },
   phone: { page: 0, x: 380, y: 485 },     // Box 'מספר טלפון נייד'
+  city: { page: 0, x: 450, y: 450 },
 
   // Bank Info (Page 1 - Middle)
   bankId: { page: 0, x: 535, y: 418 },    // Box 'קוד בנק' (278)
@@ -32,8 +35,9 @@ const COORDS_2024 = {
   accountNum: { page: 0, x: 360, y: 418 },// Box 'מספר חשבון' (277)
 
   // Tax/Income Maths (Section 158/042)
-  income: { page: 0, x: 460, y: 310 },    // Page 1, Section D, Box 158
-  taxPaid: { page: 1, x: 460, y: 500 },   // Page 2, Section T, Box 042 (Approx)
+  income: { page: 0, x: 170, y: 310 },    // Page 1, Section D, Box 158
+  taxPaid: { page: 1, x: 170, y: 500 },   // Page 2, Section T, Box 042
+  employerId: { page: 0, x: 460, y: 310 }, // Box 150
 };
 
 export async function POST(req: NextRequest) {
@@ -63,12 +67,15 @@ export async function POST(req: NextRequest) {
          }
       };
 
-      const computedTaxData = data.data; 
+      const computedTaxData = data.data || {}; 
       const personalData = data.personalData || {};
 
       // Render Identity (Numbers Only - Hebrew Text stripped for now)
       writeData(personalData.idNumber, COORDS_2024.idNumber);
       writeData(personalData.phone, COORDS_2024.phone);
+      writeData(personalData.firstName, COORDS_2024.firstName);
+      writeData(personalData.lastName, COORDS_2024.lastName);
+      writeData(personalData.city, COORDS_2024.city);
       
       // Render Bank
       writeData(personalData.bankId, COORDS_2024.bankId);
@@ -78,6 +85,7 @@ export async function POST(req: NextRequest) {
       // Render Tax Maths
       writeData(computedTaxData.income, COORDS_2024.income);
       writeData(computedTaxData.taxPaid, COORDS_2024.taxPaid);
+      writeData(computedTaxData.employerId, COORDS_2024.employerId);
 
     } else {
       // Fallback Engine if File Missing

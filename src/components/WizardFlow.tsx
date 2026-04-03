@@ -232,6 +232,11 @@ export default function WizardFlow() {
         body: JSON.stringify(payload),
       });
       
+      if (!response.ok) {
+        const errJson = await response.json();
+        throw new Error(errJson.error || "כשל ביצירת קובץ ה-PDF");
+      }
+      
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");

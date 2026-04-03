@@ -5,7 +5,7 @@ import { ArrowLeft, CheckCircle2, FileText, Banknote, ShieldCheck } from "lucide
 import Link from "next/link";
 
 export default function Home() {
-  const containerVariants = {
+  const containerVariants: any = {
     hidden: { opacity: 0 },
     visible: { 
       opacity: 1,
@@ -13,7 +13,7 @@ export default function Home() {
     }
   };
 
-  const itemVariants = {
+  const itemVariants: any = {
     hidden: { y: 20, opacity: 0 },
     visible: { y: 0, opacity: 1, transition: { type: "spring", stiffness: 100 } }
   };

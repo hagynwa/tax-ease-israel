@@ -1,0 +1,50 @@
+@import "tailwindcss";
+
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  
+  --font-sans: var(--font-heebo), sans-serif;
+}
+
+@layer base {
+
+  :root {
+    --background: #ffffff;
+    --foreground: #09090b;
+    --primary: #2563eb;
+    --primary-foreground: #ffffff;
+    --card: #ffffff;
+    --card-foreground: #09090b;
+    --border: #e4e4e7;
+  }
+
+  .dark {
+    --background: #000000;
+    --foreground: #fafafa;
+    --primary: #3b82f6;
+    --primary-foreground: #ffffff;
+    --card: #09090b;
+    --card-foreground: #fafafa;
+    --border: #27272a;
+  }
+
+}
+
+@layer base {
+  * {
+    border-color: var(--border);
+  }
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    background-image: radial-gradient(circle at top center, rgba(59, 130, 246, 0.15) 0%, transparent 40%),
+                      radial-gradient(circle at bottom left, rgba(147, 51, 234, 0.1) 0%, transparent 40%);
+    background-attachment: fixed;
+  }
+}

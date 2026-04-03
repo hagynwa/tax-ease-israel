@@ -63,7 +63,10 @@ export async function POST(req: NextRequest) {
 
       const writeData = (val: any, coord: { page: number, x: number, y: number } | undefined) => {
          if (val && coord && pages[coord.page]) {
-           pages[coord.page].drawText(String(val), { x: coord.x, y: coord.y, ...renderConfig });
+           // StandardFonts like Helvetica do NOT support Hebrew/Unicode. 
+           // We MUST strip non-printable/Unicode chars to prevent pdf-lib from throwing an error.
+           const cleanValue = String(val).replace(/[^\x00-\x7F]/g, "."); 
+           pages[coord.page].drawText(cleanValue, { x: coord.x, y: coord.y, ...renderConfig });
          }
       };
 
@@ -97,7 +100,7 @@ export async function POST(req: NextRequest) {
 
     const pdfBytes = await pdfDoc.save();
 
-    return new NextResponse(Buffer.from(pdfBytes), {
+    return new Response(Buffer.from(pdfBytes), {
       headers: {
         "Content-Type": "application/pdf",
         "Content-Disposition": `attachment; filename="Official_Form_135_${year}.pdf"`,

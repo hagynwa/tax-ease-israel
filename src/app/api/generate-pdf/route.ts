@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PDFDocument, rgb, StandardFonts } from "pdf-lib";
+import { PDFDocument, rgb } from "pdf-lib";
+import fontkit from "@pdf-lib/fontkit";
 import { join } from "path";
 import { readFileSync, existsSync } from "fs";
 
@@ -21,23 +22,36 @@ const FORM_MAP: Record<number, string> = {
  * 
  * Target X/Y pixels have been mathematically calibrated based on physical A4 scale (595x841).
  */
-const COORDS_2024 = {
+const BASE_COORDS = {
   // Identity Block (Page 1)
   idNumber: { page: 0, x: 440, y: 645 },  // Box 'מספר זהות'
-  firstName: { page: 0, x: 300, y: 605 },
-  lastName: { page: 0, x: 450, y: 605 },
-  phone: { page: 0, x: 380, y: 485 },     // Box 'מספר טלפון נייד'
-  city: { page: 0, x: 450, y: 450 },
+  firstName: { page: 0, x: 300, y: 630 },
+  lastName: { page: 0, x: 450, y: 630 },
+  phone: { page: 0, x: 380, y: 520 },     // Box 'מספר טלפון נייד'
+  city: { page: 0, x: 450, y: 485 },
 
   // Bank Info (Page 1 - Middle)
-  bankId: { page: 0, x: 535, y: 418 },    // Box 'קוד בנק' (278)
-  branchId: { page: 0, x: 480, y: 418 },  // Box 'סמל סניף'
-  accountNum: { page: 0, x: 360, y: 418 },// Box 'מספר חשבון' (277)
+  bankId: { page: 0, x: 535, y: 423 },    // Box 'קוד בנק' (278)
+  branchId: { page: 0, x: 480, y: 423 },  // Box 'סמל סניף'
+  accountNum: { page: 0, x: 360, y: 423 },// Box 'מספר חשבון' (277)
 
   // Tax/Income Maths (Section 158/042)
-  income: { page: 0, x: 170, y: 310 },    // Page 1, Section D, Box 158
-  taxPaid: { page: 1, x: 170, y: 500 },   // Page 2, Section T, Box 042
-  employerId: { page: 0, x: 460, y: 310 }, // Box 150
+  income: { page: 0, x: 170, y: 315 },    // Page 1, Section D, Box 158
+  taxPaid: { page: 1, x: 170, y: 505 },   // Page 2, Section T, Box 042
+  employerId: { page: 0, x: 460, y: 315 }, // Box 150
+};
+
+// Architecture allowing specific Y/X offsets per tax year (as forms slightly change every year)
+// Currently all mapped to the 2024 baseline. Can be fine-tuned manually later.
+const COORDS_BY_YEAR: Record<number, typeof BASE_COORDS> = {
+  2026: { ...BASE_COORDS },
+  2025: { ...BASE_COORDS },
+  2024: { ...BASE_COORDS },
+  2023: { ...BASE_COORDS },
+  2022: { ...BASE_COORDS },
+  2021: { ...BASE_COORDS },
+  2020: { ...BASE_COORDS },
+  2019: { ...BASE_COORDS },
 };
 
 export async function POST(req: NextRequest) {
@@ -58,37 +72,55 @@ export async function POST(req: NextRequest) {
       pdfDoc = await PDFDocument.load(existingPdfBytes);
       const pages = pdfDoc.getPages();
       
-      const font = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+      pdfDoc.registerFontkit(fontkit);
+      
+      let font;
+      const fontPath = join(process.cwd(), 'public', 'fonts', 'Assistant-SemiBold.ttf');
+      if (existsSync(fontPath)) {
+        const fontBytes = readFileSync(fontPath);
+        font = await pdfDoc.embedFont(fontBytes);
+      } else {
+        throw new Error("Hebrew Font not found at " + fontPath);
+      }
+
       const renderConfig = { size: 10, font, color: rgb(0, 0, 0) };
+
+      const reverseHebrew = (str: string) => {
+        return String(str).split(' ').reverse().map(word => {
+          if (/^[0-9A-Za-z.\-\/]+$/.test(word)) return word;
+          return word.split('').reverse().join('');
+        }).join(' ');
+      };
 
       const writeData = (val: any, coord: { page: number, x: number, y: number } | undefined) => {
          if (val && coord && pages[coord.page]) {
-           // StandardFonts like Helvetica do NOT support Hebrew/Unicode. 
-           // We MUST strip non-printable/Unicode chars to prevent pdf-lib from throwing an error.
-           const cleanValue = String(val).replace(/[^\x00-\x7F]/g, "."); 
-           pages[coord.page].drawText(cleanValue, { x: coord.x, y: coord.y, ...renderConfig });
+           const reversed = reverseHebrew(val); 
+           pages[coord.page].drawText(reversed, { x: coord.x, y: coord.y, ...renderConfig });
          }
       };
 
       const computedTaxData = data.data || {}; 
       const personalData = data.personalData || {};
 
+      // Get year-specific coordinates or fallback to baseline
+      const activeCoords = COORDS_BY_YEAR[year as number] || BASE_COORDS;
+
       // Render Identity (Numbers Only - Hebrew Text stripped for now)
-      writeData(personalData.idNumber, COORDS_2024.idNumber);
-      writeData(personalData.phone, COORDS_2024.phone);
-      writeData(personalData.firstName, COORDS_2024.firstName);
-      writeData(personalData.lastName, COORDS_2024.lastName);
-      writeData(personalData.city, COORDS_2024.city);
+      writeData(personalData.idNumber, activeCoords.idNumber);
+      writeData(personalData.phone, activeCoords.phone);
+      writeData(personalData.firstName, activeCoords.firstName);
+      writeData(personalData.lastName, activeCoords.lastName);
+      writeData(personalData.city, activeCoords.city);
       
       // Render Bank
-      writeData(personalData.bankId, COORDS_2024.bankId);
-      writeData(personalData.branchId, COORDS_2024.branchId);
-      writeData(personalData.accountNum, COORDS_2024.accountNum);
+      writeData(personalData.bankId, activeCoords.bankId);
+      writeData(personalData.branchId, activeCoords.branchId);
+      writeData(personalData.accountNum, activeCoords.accountNum);
 
       // Render Tax Maths
-      writeData(computedTaxData.income, COORDS_2024.income);
-      writeData(computedTaxData.taxPaid, COORDS_2024.taxPaid);
-      writeData(computedTaxData.employerId, COORDS_2024.employerId);
+      writeData(computedTaxData.income, activeCoords.income);
+      writeData(computedTaxData.taxPaid, activeCoords.taxPaid);
+      writeData(computedTaxData.employerId, activeCoords.employerId);
 
     } else {
       // Fallback Engine if File Missing

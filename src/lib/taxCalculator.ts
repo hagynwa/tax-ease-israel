@@ -59,32 +59,32 @@ export function calculateChildPoints(childrenBirthYears: number[], selectedYear:
     if (age > 18) continue; 
 
     if (selectedYear >= 2024) {
-       if (age === 0) totalChildPoints += 2.5;
-       else if (age === 1 || age === 2) totalChildPoints += 4.5;
-       else if (age === 3) totalChildPoints += 3.5;
-       else if (age === 4 || age === 5) totalChildPoints += 2.5;
+       if (age === 0) totalChildPoints += (gender === "female") ? 2.5 : 1.0;
+       else if (age === 1 || age === 2) totalChildPoints += (gender === "female") ? 4.5 : 2.0;
+       else if (age === 3) totalChildPoints += (gender === "female") ? 3.5 : 2.0;
+       else if (age === 4 || age === 5) totalChildPoints += (gender === "female") ? 2.5 : 1.0;
        else if (age >= 6 && age <= 17) {
          totalChildPoints += (gender === "female") ? 2 : 1;
        } else if (age === 18) {
-         totalChildPoints += 0.5; // residual often given in 18th year
+         totalChildPoints += (gender === "female") ? 0.5 : 0;
        }
     } else if (selectedYear === 2022 || selectedYear === 2023) {
-       if (age === 0) totalChildPoints += 1.5;
-       else if (age >= 1 && age <= 5) totalChildPoints += 2.5;
+       if (age === 0) totalChildPoints += (gender === "female") ? 1.5 : 0;
+       else if (age >= 1 && age <= 5) totalChildPoints += (gender === "female") ? 2.5 : 1.0;
        else if (age >= 6 && age <= 12) {
          totalChildPoints += (gender === "female") ? 2 : 1; 
        } else if (age >= 13 && age <= 17) {
          totalChildPoints += (gender === "female") ? 1 : 0;
        } else if (age === 18) {
-         totalChildPoints += 0.5;
+         totalChildPoints += (gender === "female") ? 0.5 : 0;
        }
     } else {
-       if (age === 0) totalChildPoints += 1.5;
-       else if (age >= 1 && age <= 5) totalChildPoints += 2.5;
+       if (age === 0) totalChildPoints += (gender === "female") ? 1.5 : 0;
+       else if (age >= 1 && age <= 5) totalChildPoints += (gender === "female") ? 2.5 : 0;
        else if (age >= 6 && age <= 17) {
          totalChildPoints += (gender === "female") ? 1 : 0;
        } else if (age === 18) {
-         totalChildPoints += 0.5;
+         totalChildPoints += (gender === "female") ? 0.5 : 0;
        }
     }
   }
@@ -97,6 +97,8 @@ interface TaxOptions {
   lifeInsurance: number;
   peripheryPercent: number;
   peripheryCeiling: number;
+  maternityAllowance?: number;
+  deferredPoint?: boolean;
 }
 
 export function calculateTaxRefund(
@@ -105,18 +107,31 @@ export function calculateTaxRefund(
   monthsWorked: number = 12, 
   userPoints: number = 2.25, 
   year: number = new Date().getFullYear(),
-  options: TaxOptions = { donations: 0, lifeInsurance: 0, peripheryPercent: 0, peripheryCeiling: 0 }
+  options: TaxOptions = { donations: 0, lifeInsurance: 0, peripheryPercent: 0, peripheryCeiling: 0, maternityAllowance: 0, deferredPoint: false }
 ) {
+  let effectiveIncome = income + (options.maternityAllowance || 0);
+  let effectivePoints = userPoints - (options.deferredPoint ? 1 : 0);
+
   let taxOwed = 0;
-  let remainingIncome = income;
+  let remainingIncome = effectiveIncome;
   let previousLimit = 0;
   let breakdown: string[] = [];
   
   const brackets = getBracketsForYear(year);
   const pointValueAnnual = (CREDIT_POINT_VALUES[year] || 242) * 12;
 
-  breakdown.push(`הכנסה שנתית ברוטו: ₪${income.toLocaleString()}`);
+  if (options.maternityAllowance && options.maternityAllowance > 0) {
+    breakdown.push(`הכנסה ברוטו ממדרגות שכר: ₪${income.toLocaleString()}`);
+    breakdown.push(`הכנסה מדמי לידה (ביטוח לאומי): ₪${options.maternityAllowance.toLocaleString()}`);
+    breakdown.push(`סה"כ הכנסה שנתית לחישוב: ₪${effectiveIncome.toLocaleString()}`);
+  } else {
+    breakdown.push(`הכנסה שנתית ברוטו: ₪${income.toLocaleString()}`);
+  }
+  
   breakdown.push(`שנת מס מחושבת: ${year}`);
+  if (options.deferredPoint) {
+    breakdown.push(`דחיית נקודת זיכוי אחת לשנת המס הבאה (לפי טופס 116ד'): הופחתה נקודה אחת מהחישוב הנוכחי.`);
+  }
 
   for (const bracket of brackets) {
     const bracketSize = bracket.limit - previousLimit;
@@ -138,12 +153,12 @@ export function calculateTaxRefund(
 
   breakdown.push(`סה"כ מס תיאורטי לפני הנחות: ₪${Math.floor(taxOwed).toLocaleString()}`);
 
-  const pointsCredit = userPoints * pointValueAnnual * (monthsWorked / 12);
-  breakdown.push(`קיזוז נקודות זיכוי אישיות (${userPoints}): -₪${Math.floor(pointsCredit).toLocaleString()}`);
+  const pointsCredit = effectivePoints * pointValueAnnual * (monthsWorked / 12);
+  breakdown.push(`קיזוז נקודות זיכוי אישיות (${effectivePoints.toFixed(2)}): -₪${Math.floor(pointsCredit).toLocaleString()}`);
   taxOwed = Math.max(0, taxOwed - pointsCredit);
 
   if (options.peripheryPercent > 0 && options.peripheryCeiling > 0) {
-    const peripheryIncomeEligible = Math.min(income, options.peripheryCeiling);
+    const peripheryIncomeEligible = Math.min(effectiveIncome, options.peripheryCeiling);
     const peripheryDiscountAmount = peripheryIncomeEligible * (options.peripheryPercent / 100);
     breakdown.push(`הטבת יישוב פריפריה מוטב (${options.peripheryPercent}% עד ₪${options.peripheryCeiling.toLocaleString()}): -₪${Math.floor(peripheryDiscountAmount).toLocaleString()}`);
     taxOwed = Math.max(0, taxOwed - peripheryDiscountAmount);

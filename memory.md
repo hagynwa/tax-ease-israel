@@ -3,6 +3,18 @@
 ## Project Overview
 TaxEase is an advanced Next.js web application built to automate Israeli tax refunds (החזר מס) and tax coordination (תיאום מס). It translates complex historical tax brackets and demographics into an intuitive, gamified UI utilizing conversational flows and dynamic document generation.
 
+## Development Progress
+- [x] Step 5: Advanced Personal & Bank Data Wizards.
+- [x] Step 6: Form 135 PDF Generation with coordinate-based injection.
+- [x] ID Appendix OCR: Exhaustive birth year scanning and auto-demographics.
+- [x] Periphery Residency: Auto-calculating discounts based on city mapping.
+- [x] Railway Deployment: Configured with Supabase safety checks.
+
+## Critical Constraints (USER ENFORCED)
+1. **NO AUTO-PUSH**: Do not push to GitHub or deploy without asking. User prefers checking everything on `localhost:3000` first.
+2. **Local Testing**: Always confirm "Look at it on localhost" before finalizing a turn.
+3. **PDF Hebrew**: Helvetica font used for numbers only. Hebrew text must be cleaned (`replace(/[^\x00-\x7F]/g, ".")`) to prevent crashes until Hebrew TTF is embedded.
+
 ## Expert Knowledge: Israeli Income Tax Rules
 Through deep research, the following rigid constructs govern our Tax Engine:
 1. **Siyua LaHorim (Children Points)**: Child points are heavily tethered to historical years. We must compute `Selected Year - Birth Year`. Prior to 2022, ages 6-17 didn't get points for men. In 2024, points were wildly expanded (e.g. 4.5 points for 1-2 year olds).

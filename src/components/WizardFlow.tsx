@@ -7,6 +7,7 @@ import Link from "next/link";
 import PrintableSummary from "./PrintableSummary";
 import { calculateChildPoints } from "@/lib/taxCalculator";
 import { getPeripheryBenefitByCity } from "@/lib/peripheryMap";
+import { createClient } from "@/utils/supabase/client";
 
 type FlowType = "none" | "refund" | "coordination";
 
@@ -27,8 +28,62 @@ interface AnalysisResult {
   }
 }
 
+const persistKey = "tax_ease_wizard_state";
+
 export default function WizardFlow() {
+  const supabase = createClient();
+  const [user, setUser] = useState<any>(null);
+  const [loadingAuth, setLoadingAuth] = useState(true);
   const [step, setStep] = useState(0);
+
+  // AUTH & PERSISTENCE LIFECYCLE
+  useEffect(() => {
+    // 1. Listen for Auth Changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      setUser(session?.user ?? null);
+      setLoadingAuth(false);
+    });
+
+    // 2. Hydrate State from LocalStorage (if returning from login)
+    const saved = localStorage.getItem(persistKey);
+    if (saved) {
+      try {
+        const state = JSON.parse(saved);
+        setStep(state.step);
+        setFlow(state.flow);
+        setSelectedYear(state.selectedYear);
+        setGender(state.gender);
+        setChildBirthYears(state.childBirthYears);
+        setResult(state.result);
+        setFirstName(state.firstName);
+        setLastName(state.lastName);
+        setIdNumber(state.idNumber);
+        setCity(state.city);
+        // Clear it so it doesn't stay forever
+        localStorage.removeItem(persistKey);
+      } catch (e) {
+        console.error("Failed to hydrate state", e);
+      }
+    }
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleLogin = async () => {
+    // Save current progress before redirect
+    const stateToSave = {
+      step, flow, selectedYear, gender, childBirthYears, result, 
+      firstName, lastName, idNumber, city
+    };
+    localStorage.setItem(persistKey, JSON.stringify(stateToSave));
+
+    await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: window.location.origin + '/api/auth/callback?next=/wizard'
+      }
+    });
+  };
   const [flow, setFlow] = useState<FlowType>("none");
   const [selectedYear, setSelectedYear] = useState<number | null>(null);
   
@@ -45,6 +100,12 @@ export default function WizardFlow() {
   const [isOleh, setIsOleh] = useState(false);
   const [hasDisability, setHasDisability] = useState(false); 
   const [paysAlimony, setPaysAlimony] = useState(false); 
+  
+  // Maternity & Birth
+  const [gaveBirthThisYear, setGaveBirthThisYear] = useState(false);
+  const [maternityAllowance, setMaternityAllowance] = useState<number>(0);
+  const [unpaidLeaveMonths, setUnpaidLeaveMonths] = useState<number>(0);
+  const [deferredPoint, setDeferredPoint] = useState(false);
   
   // Expert Tax Law Requirements
   const [livesInPeriphery, setLivesInPeriphery] = useState(false);
@@ -68,6 +129,7 @@ export default function WizardFlow() {
   const [uploadSuccess, setUploadSuccess] = useState(false);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
+  const [showAudit, setShowAudit] = useState(false);
   
   // Auto-Compute Periphery Benefits Based on City
   useEffect(() => {
@@ -188,10 +250,15 @@ export default function WizardFlow() {
       if (selectedYear) formData.append("year", selectedYear.toString());
       formData.append("points", calculatedPoints.toString());
       
+      // Expert Variables
       formData.append("donations", donations.toString());
       formData.append("lifeInsurance", lifeInsurance.toString());
       formData.append("peripheryPercent", livesInPeriphery ? peripheryPercent.toString() : "0");
       formData.append("peripheryCeiling", livesInPeriphery ? peripheryCeiling.toString() : "0");
+      
+      // Maternity / Birth
+      formData.append("maternityAllowance", maternityAllowance.toString());
+      formData.append("deferredPoint", deferredPoint.toString());
 
       const response = await fetch("/api/analyze-form", {
         method: "POST",
@@ -223,7 +290,9 @@ export default function WizardFlow() {
         year: selectedYear,
         personalData: {
           firstName, lastName, idNumber, city, street, phone, bankId, branchId, accountNum
-        }
+        },
+        maternityAllowance,
+        deferredPoint
       };
 
       const response = await fetch("/api/generate-pdf", {
@@ -294,15 +363,24 @@ export default function WizardFlow() {
             {step === 0 && ( /* omitted for brevity, handled implicitly by React state block */ 
               <motion.div key="step-0" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="space-y-6">
                 <h2 className="text-3xl font-bold text-center mb-8">מה המטרה שלנו היום?</h2>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-w-2xl mx-auto">
+                <div className="flex flex-col gap-4 max-w-sm mx-auto">
                   <button onClick={() => handleFlowSelect("refund")} className="flex flex-col items-center justify-center p-8 rounded-2xl border border-white/10 bg-white/5 hover:bg-primary/20 hover:border-primary/50 transition-all group text-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform"><History className="w-8 h-8" /></div>
                     <div><h3 className="text-xl font-bold mb-2">החזר מס</h3><p className="text-sm text-neutral-400">שילמתי יותר מדי מס ואני רוצה כסף חזרה.</p></div>
                   </button>
+                  {/* Disabled for MVP (Do not delete)
                   <button onClick={() => handleFlowSelect("coordination")} className="flex flex-col items-center justify-center p-8 rounded-2xl border border-white/10 bg-white/5 hover:bg-purple-500/20 hover:border-purple-500/50 transition-all group text-center gap-4">
                     <div className="w-16 h-16 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform"><CalendarClock className="w-8 h-8" /></div>
                     <div><h3 className="text-xl font-bold mb-2">תיאום מס</h3><p className="text-sm text-neutral-400">מונע ניכוי מס מקסימלי השנה.</p></div>
                   </button>
+                  */}
+                </div>
+                
+                <div className="mt-8 text-center text-sm text-neutral-400 bg-white/5 border border-white/10 rounded-xl p-4 max-w-xl mx-auto flex items-start gap-3">
+                  <Info className="w-5 h-5 text-blue-400 flex-shrink-0 mt-0.5" />
+                  <p className="text-right">
+                    <strong>לתשומת לבכם:</strong> בגרסתה הנוכחית, המערכת מותאמת לבדיקת החזר מס <strong>אישית לשכירים בלבד</strong> (ללא בעלי עסקים עצמאיים וללא שקלול חובת הגשה זוגית).
+                  </p>
                 </div>
               </motion.div>
             )}
@@ -381,11 +459,95 @@ export default function WizardFlow() {
                           </div>
                         ))}
                       </div>
-                    )}
+                     )}
                   </div>
-                  
+
+                  {/* Birth & Maternity (Female only) */}
+                  {gender === "female" && (
+                    <motion.div 
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-pink-500/5 p-5 rounded-2xl border border-pink-500/20 space-y-4"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3 text-pink-400">
+                          <div className="p-2 bg-pink-500/20 rounded-lg">
+                            <Baby className="w-6 h-6" />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-white">לידה והורות בשנה זו ({selectedYear})</h4>
+                            <p className="text-xs text-neutral-400">חופשת לידה, דמי לידה ודחיית נקודות</p>
+                          </div>
+                        </div>
+                        <button 
+                          onClick={() => setGaveBirthThisYear(!gaveBirthThisYear)}
+                          className={`w-12 h-6 rounded-full transition-colors relative ${gaveBirthThisYear ? 'bg-pink-500' : 'bg-white/10'}`}
+                        >
+                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-all ${gaveBirthThisYear ? 'left-1' : 'left-7'}`} />
+                        </button>
+                      </div>
+
+                      {gaveBirthThisYear && (
+                        <div className="space-y-4 pt-4 border-t border-pink-500/10">
+                          <div className="bg-black/40 p-4 rounded-xl border border-white/5">
+                            <label className="text-xs text-neutral-400 block mb-2 font-medium">סכום דמי לידה ברוטו (מביטוח לאומי)</label>
+                            <div className="flex items-center">
+                              <span className="text-neutral-500 ml-2">₪</span>
+                              <input 
+                                type="number" 
+                                value={maternityAllowance || ""} 
+                                onChange={(e) => setMaternityAllowance(parseInt(e.target.value) || 0)}
+                                placeholder="לדוגמה: 35,000"
+                                className="w-full bg-transparent border-none outline-none text-white font-bold text-left"
+                              />
+                            </div>
+                          </div>
+
+                          <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-black/40 p-4 rounded-xl border border-white/5">
+                              <label className="text-xs text-neutral-400 block mb-2 font-medium">חודשי חל"ת לאחר לידה</label>
+                              <input 
+                                type="number" 
+                                value={unpaidLeaveMonths || ""} 
+                                onChange={(e) => setUnpaidLeaveMonths(parseInt(e.target.value) || 0)}
+                                placeholder="0"
+                                className="w-full bg-transparent border-none outline-none text-white font-bold text-center"
+                              />
+                            </div>
+                            <button 
+                              onClick={() => setDeferredPoint(!deferredPoint)}
+                              className={`p-4 rounded-xl border transition-all flex flex-col items-center justify-center gap-1 ${deferredPoint ? 'bg-pink-500/20 border-pink-500/50 text-pink-400' : 'bg-black/40 border-white/5 text-neutral-400'}`}
+                            >
+                              <span className="text-[10px] font-bold">דחיית נקודת זיכוי</span>
+                              <span className="text-[9px] leading-tight text-center opacity-70">מומלץ אם ההכנסה נמוכה (טופס 116ד')</span>
+                            </button>
+                          </div>
+                        </div>
+                      )}
+                    </motion.div>
+                  )}
+                </div>
+
+                <div className="pt-6 border-t border-white/10 text-left">
+                   <button onClick={nextStep} className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-neutral-200 transition-colors inline-flex items-center gap-2">
+                     המשך להטבות כספיות <ArrowRight className="w-4 h-4 rotate-180" />
+                   </button>
+                </div>
+              </motion.div>
+            )}
+
+            {step === 3 && (
+              <motion.div key="step-financials" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="space-y-6 text-right max-w-2xl mx-auto w-full">
+                <div className="flex justify-between items-end border-b border-white/10 pb-4 mb-6">
+                   <div>
+                     <h2 className="text-3xl font-bold mb-2">השכלה והטבות כספיות</h2>
+                     <p className="text-neutral-400 text-sm">המערכת תחשב זיכויים לסטודנטים, ביטוחים, ופריפריה.</p>
+                   </div>
+                </div>
+
+                <div className="space-y-6 bg-black/20 p-6 rounded-2xl border border-white/5">
                   {/* DEGREE */}
-                  <div className="pt-4 border-t border-white/5">
+                  <div className="pb-4 border-b border-white/5">
                      <div className="flex items-center gap-3 mb-4"><GraduationCap className="w-5 h-5 text-neutral-400" /><span className="font-semibold text-lg">תואר אקדמי</span></div>
                      <div className="grid grid-cols-3 gap-2 mb-4">
                         <button onClick={() => setDegree("none")} className={`py-2 rounded-lg border transition-colors text-sm font-bold ${degree === "none" ? "bg-blue-500/20 border-blue-500/50 text-blue-400" : "bg-white/5 border-white/10 text-neutral-400 hover:text-white"}`}>אין</button>
@@ -393,11 +555,6 @@ export default function WizardFlow() {
                         <button onClick={() => setDegree("master")} className={`py-2 rounded-lg border transition-colors text-sm font-bold ${degree === "master" ? "bg-blue-500/20 border-blue-500/50 text-blue-400" : "bg-white/5 border-white/10 text-neutral-400 hover:text-white"}`}>תואר שני</button>
                      </div>
                   </div>
-                </div>
-
-                {/* ADVANCED FINANCIAL OFFSETS */}
-                <div className="space-y-6 bg-black/20 p-6 rounded-2xl border border-white/5 mt-4">
-                  <h3 className="font-bold text-white/80 border-b border-white/10 pb-2">זיכויים כספיים ופריפריה (חישוב ישיר)</h3>
 
                   <div className="space-y-4 pt-2">
                     <div className="flex justify-between items-center bg-white/5 p-4 rounded-xl border border-white/10 hover:border-white/20 transition-colors">
@@ -464,7 +621,6 @@ export default function WizardFlow() {
                      </AnimatePresence>
                   </div>
                 </div>
-
                 <div className="pt-6 border-t border-white/10 text-left">
                    <button onClick={nextStep} className="px-8 py-3 bg-white text-black font-bold rounded-xl hover:bg-neutral-200 transition-colors inline-flex items-center gap-2">
                      המשך להעלאת מסמכים <ArrowRight className="w-4 h-4 rotate-180" />
@@ -474,13 +630,13 @@ export default function WizardFlow() {
               </motion.div>
             )}
 
-            {step === 3 && (
+            {step === 4 && (
               <motion.div key="step-upload" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="text-center space-y-6 py-4">
                 <h2 className="text-3xl font-bold mb-4">בואו נעלה את מסמכי ההכנסות</h2>
                 
                 <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 text-right max-w-lg mx-auto mb-6">
                   <h3 className="font-semibold text-blue-400 mb-2 border-b border-white/10 pb-2">מה להעלות עכשיו?</h3>
-                  <p className="text-neutral-300 mb-4 leading-relaxed">טפסי 106 מקוריים או אישורי פנסיה המעידים על הכנסה בשנת {selectedYear}.</p>
+                  <p className="text-neutral-300 mb-4 leading-relaxed">טפסי 106 מקוריים ממעסיקים, או אישורי תשלום מביטוח לאומי (לדוגמה: על דמי לידה) המעידים על הכנסה בשנת {selectedYear}.</p>
                 </div>
 
                 {!uploadSuccess ? (
@@ -504,48 +660,119 @@ export default function WizardFlow() {
               </motion.div>
             )}
 
-            {/* STEP 4: Results */}
-            {step === 4 && result && (
+            {/* STEP 5: Results */}
+            {step === 5 && result && (
                <motion.div key="step-results" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="w-full text-right">
-                <div className="text-center mb-8">
-                  <h2 className="text-4xl font-bold mb-2">שקלול החזר מס רשמי</h2>
-                  <p className="text-neutral-400">התוצאה נמדדת משפטית לחוקי המס של {selectedYear}.</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-                  <div className="bg-neutral-900/60 p-6 rounded-2xl border border-white/5 flex flex-col justify-between">
-                     <h3 className="text-lg font-bold mb-2 text-white/80">החזר משוער לאחר ניכויים</h3>
-                     <div className="bg-black/40 rounded-xl p-4 text-center mt-4">
-                       <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-l from-green-400 to-emerald-500">
-                         ₪{Math.floor(result.analysis.anticipatedRefund).toLocaleString()}
-                       </span>
-                     </div>
-                     {result.analysis.breakdown && (
-                      <div className="mt-6 border-t border-white/5 pt-4 space-y-2 text-xs text-neutral-400 bg-black/20 p-3 rounded-xl overflow-y-auto max-h-48">
-                        {result.analysis.breakdown.map((line, idx) => ( <p key={idx} className="leading-relaxed border-b border-white/5 pb-1">👉 {line}</p> ))}
-                      </div>
-                     )}
-                  </div>
-                  <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
-                    <h3 className="text-lg font-bold mb-4 text-orange-400 flex items-center gap-2"><FileDown className="w-5 h-5" /> רשימת מסמכים להגשה</h3>
-                    <div className="space-y-3 text-sm text-neutral-300">
-                      {computeRequiredDocuments().map((doc, idx) => (
-                        <div key={idx} className="flex items-start gap-2 bg-black/40 p-3 rounded-lg border border-white/5"><CheckCircle2 className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" /><span className="leading-snug">{doc}</span></div>
-                      ))}
+                {!user ? (
+                  /* LOCKED GATEWAY */
+                  <div className="max-w-xl mx-auto text-center py-12 px-6 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-md relative overflow-hidden">
+                    <div className="absolute -top-24 -left-24 w-48 h-48 bg-blue-500/20 blur-[60px] rounded-full" />
+                    <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-purple-500/20 blur-[60px] rounded-full" />
+                    
+                    <div className="w-20 h-20 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 text-blue-400 border border-blue-500/20">
+                      <ShieldCheck className="w-10 h-10" />
+                    </div>
+                    
+                    <h2 className="text-3xl font-black mb-4">התוצאות שלך מוכנות!</h2>
+                    <p className="text-neutral-300 mb-8 leading-relaxed">
+                      כדי לצפות בשווי החזר המס המדויק שלך ולשמור את הנתונים לעדכון עתידי, עליך להתחבר באמצעות חשבון Google. 
+                      <br />
+                      <span className="text-blue-400 font-semibold italic text-sm">(התהליך לוקח 5 שניות בלבד)</span>
+                    </p>
+                    
+                    <button 
+                      onClick={handleLogin}
+                      className="w-full h-14 bg-white text-black rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-neutral-200 transition-all shadow-xl"
+                    >
+                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google" />
+                      התחבר עם Google וחשוף את ההחזר שלי
+                    </button>
+                    
+                    <div className="mt-8 flex items-center justify-center gap-6 text-xs text-neutral-500">
+                      <div className="flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> מאובטח SSL</div>
+                      <div className="flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> פרטיות מובטחת</div>
                     </div>
                   </div>
-                </div>
+                ) : (
+                  /* UNLOCKED RESULTS */
+                  <>
+                    <div className="text-center mb-8">
+                      <h2 className="text-4xl font-bold mb-2">שקלול החזר מס רשמי</h2>
+                      <p className="text-neutral-400">שלום {user.user_metadata?.full_name || user.email}, התוצאה נמדדת משפטית לחוקי המס של {selectedYear}.</p>
+                    </div>
 
-                <div className="pt-6 border-t border-white/10 text-left">
-                   <button onClick={nextStep} className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors inline-flex items-center gap-2">
-                     המשך למילוי טופס 135 הרשמי <ArrowRight className="w-4 h-4 rotate-180" />
-                   </button>
-                </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+                      <div className="bg-neutral-900/60 p-6 rounded-2xl border border-white/5 flex flex-col justify-between">
+                        <h3 className="text-lg font-bold mb-2 text-white/80">החזר משוער לאחר ניכויים</h3>
+                        <div className="bg-black/40 rounded-xl p-4 text-center mt-4">
+                          <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-l from-green-400 to-emerald-500">
+                            ₪{Math.floor(result.analysis.anticipatedRefund).toLocaleString()}
+                          </span>
+                        </div>
+                        <div className="mt-6 border-t border-white/5 pt-4">
+                          <button 
+                            onClick={() => setShowAudit(!showAudit)}
+                            className="w-full py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-neutral-300 font-bold transition-colors flex justify-center items-center gap-2"
+                          >
+                            <Info className="w-4 h-4" />
+                            {showAudit ? "הסתר פירוט נתונים וחישוב" : "הצג פירוט נתונים וחישוב (לצרכי בקרה)"}
+                          </button>
+                          
+                          <AnimatePresence>
+                            {showAudit && (
+                              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="overflow-hidden mt-4">
+                                <div className="space-y-4 text-xs bg-black/40 p-4 rounded-xl border border-white/5 text-right">
+                                  <div>
+                                    <h4 className="font-bold text-blue-400 mb-2 border-b border-white/10 pb-1">נתונים שחולצו (Inputs)</h4>
+                                    <ul className="text-neutral-300 space-y-1">
+                                      <li><span className="text-neutral-500">הכנסה שנתית ברוטו:</span> {result.data.income} ₪</li>
+                                      <li><span className="text-neutral-500">מס ששולם בפועל:</span> {result.data.taxPaid} ₪</li>
+                                      <li><span className="text-neutral-500">חודשי עבודה:</span> {result.data.monthsWorked}</li>
+                                      <li><span className="text-neutral-500">נקודות זיכוי אישיות:</span> {calculatedPoints}</li>
+                                    </ul>
+                                  </div>
+
+                                  {result.analysis.breakdown && (
+                                    <div>
+                                      <h4 className="font-bold text-green-400 mb-2 border-b border-white/10 pb-1">לוגיקת חישוב (Math Logic)</h4>
+                                      <div className="space-y-1 text-neutral-300 font-mono text-[11px] leading-relaxed">
+                                        {result.analysis.breakdown.map((line: string, idx: number) => ( 
+                                          <p key={idx}>[step {idx+1}] {line}</p> 
+                                        ))}
+                                      </div>
+                                    </div>
+                                  )}
+                                </div>
+                              </motion.div>
+                            )}
+                          </AnimatePresence>
+                        </div>
+                      </div>
+                      <div className="bg-white/5 p-6 rounded-2xl border border-white/10">
+                        <h3 className="text-lg font-bold mb-4 text-orange-400 flex items-center gap-2"><FileDown className="w-5 h-5" /> רשימת מסמכים להגשה</h3>
+                        <div className="space-y-3 text-sm text-neutral-300">
+                          {computeRequiredDocuments().map((doc: string, idx: number) => (
+                            <div key={idx} className="flex items-start gap-2 bg-black/40 p-3 rounded-lg border border-white/5">
+                              <CheckCircle2 className="w-4 h-4 text-orange-500 flex-shrink-0 mt-0.5" />
+                              <span className="leading-snug">{doc}</span>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className="pt-6 border-t border-white/10 text-left">
+                      <button onClick={nextStep} className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors inline-flex items-center gap-2">
+                        המשך למילוי טופס 135 הרשמי <ArrowRight className="w-4 h-4 rotate-180" />
+                      </button>
+                    </div>
+                  </>
+                )}
              </motion.div>
             )}
 
-            {/* STEP 5: PERSONAL DATA CAPTURE -> PDF DOWNLAD */}
-            {step === 5 && (
+            {/* STEP 6: PERSONAL DATA CAPTURE -> PDF DOWNLAD */}
+            {step === 6 && (
               <motion.div key="step-personal" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="w-full text-right space-y-6">
                 <div>
                    <h2 className="text-3xl font-bold mb-2">פרטים אישיים לטובת הטופס</h2>
@@ -626,7 +853,7 @@ export default function WizardFlow() {
           </AnimatePresence>
         </div>
       </div>
-      {result && step < 5 && <PrintableSummary result={result!} year={selectedYear} />}
+      {result && step < 6 && <PrintableSummary result={result!} year={selectedYear} />}
     </>
   );
 }

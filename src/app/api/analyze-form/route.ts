@@ -14,6 +14,8 @@ export async function POST(req: NextRequest) {
     const lifeInsurance = parseFloat(formData.get("lifeInsurance") as string) || 0;
     const peripheryPercent = parseFloat(formData.get("peripheryPercent") as string) || 0;
     const peripheryCeiling = parseFloat(formData.get("peripheryCeiling") as string) || 0;
+    const maternityAllowanceInput = parseFloat(formData.get("maternityAllowance") as string) || 0;
+    const deferredPoint = formData.get("deferredPoint") === "true";
 
     const year = yearStr ? parseInt(yearStr) : new Date().getFullYear();
     const userPoints = pointsStr ? parseFloat(pointsStr) : 2.25;
@@ -44,18 +46,18 @@ export async function POST(req: NextRequest) {
           `You are an expert Israeli accountant AI.
            The user selected the tax year: ${year}.
            Analyze the uploaded document. If it is NOT a Form 106, Payslip, or Form 161, set isValidTaxDoc to false.
-           Extract the primary tax year written on the document (usually "שנת מס"). 
-           Extract the following exact fields into a raw JSON object:
-           {
-             "isValidTaxDoc": boolean (true if it's a 106, payslip, 161, etc),
-             "documentYear": number (the tax year stated on the form),
-             "employerId": "string (תיק ניכויים)",
-             "employerName": "string",
-             "income": number (total from section 158 or 172 sum),
-             "taxPaid": number (amount in section 042),
-             "monthsWorked": number (how many months this employee worked according to the form)
-           }
-           Return exactly and ONLY valid JSON without markdown wrapping or backticks.`,
+           Extract the primary tax year written on the document (usually "שנת מס").            Extract the following exact fields into a raw JSON object:
+            {
+              "isValidTaxDoc": boolean (true if it's a 106, 161, or Bituach Leumi Maternity Confirmation),
+              "documentYear": number (the tax year stated on the form),
+              "employerId": "string (תיק ניכויים)",
+              "employerName": "string",
+              "income": number (total from section 158 or 172 sum),
+              "taxPaid": number (amount in section 042),
+              "monthsWorked": number (how many months this employee worked according to the form),
+              "maternityAllowanceDetected": number (if this is a Bituach Leumi form, extract the total "דמי לידה" amount)
+            }
+            Return exactly and ONLY valid JSON without markdown wrapping or backticks.`,
           {
             inlineData: {
               data: base64Str,
@@ -92,7 +94,9 @@ export async function POST(req: NextRequest) {
       donations,
       lifeInsurance,
       peripheryPercent,
-      peripheryCeiling
+      peripheryCeiling,
+      maternityAllowance: Math.max(maternityAllowanceInput, (extractedData as any).maternityAllowanceDetected || 0),
+      deferredPoint
     };
 
     const analysis = calculateTaxRefund(

@@ -157,21 +157,27 @@ export default function WizardFlow() {
     pts += calculateChildPoints(childBirthYears, yearForMath, gender);
 
     if (singleParent) pts += 1;
-    if (soldier) pts += 1;
+    // Note: soldier and isOleh are kept as state variables for future MVP phases
+    // but are not included in calculations until UI toggles are added.
     if (!degreeUsed) {
       if (degree === "bachelor") pts += 1;
       if (degree === "master") pts += 0.5;
     }
-    if (isOleh) pts += 1; 
     return pts;
-  }, [gender, childBirthYears, degree, degreeUsed, soldier, singleParent, isOleh, selectedYear, currentYear]);
+  }, [gender, childBirthYears, degree, degreeUsed, singleParent, selectedYear, currentYear]);
 
   const handleFlowSelect = (selected: FlowType) => {
     setFlow(selected);
     setStep(1);
   };
 
-  const nextStep = () => setStep(s => s + 1);
+  const nextStep = () => {
+    if (step === 2 && uploadingId) {
+      const confirmed = window.confirm("שימו לב — תהליך חילוץ הנתונים מספח תעודת הזהות עדיין רץ ברקע.\nאם תעברו לשלב הבא עכשיו, ייתכן שהנתונים לא יעודכנו.\n\nלהמשיך בכל זאת?");
+      if (!confirmed) return;
+    }
+    setStep(s => s + 1);
+  };
   const prevStep = () => setStep(s => s - 1);
 
   // Parse ID Appendix
@@ -710,11 +716,22 @@ export default function WizardFlow() {
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                       <div className="bg-neutral-900/60 p-6 rounded-2xl border border-white/5 flex flex-col justify-between">
-                        <h3 className="text-lg font-bold mb-2 text-white/80">החזר משוער לאחר ניכויים</h3>
+                        <h3 className="text-lg font-bold mb-2 text-white/80">
+                          {result.analysis.anticipatedRefund >= 0 ? 'החזר משוער לאחר ניכויים' : '⚠️ חוב מס משוער'}
+                        </h3>
                         <div className="bg-black/40 rounded-xl p-4 text-center mt-4">
-                          <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-l from-green-400 to-emerald-500">
-                            ₪{Math.floor(result.analysis.anticipatedRefund).toLocaleString()}
-                          </span>
+                          {result.analysis.anticipatedRefund >= 0 ? (
+                            <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-l from-green-400 to-emerald-500">
+                              ₪{Math.floor(result.analysis.anticipatedRefund).toLocaleString()}
+                            </span>
+                          ) : (
+                            <>
+                              <span className="text-5xl font-black text-transparent bg-clip-text bg-gradient-to-l from-red-400 to-orange-500">
+                                -₪{Math.floor(Math.abs(result.analysis.anticipatedRefund)).toLocaleString()}
+                              </span>
+                              <p className="text-sm text-red-300 mt-3">שילמת פחות מדי מס השנה. ייתכן שתידרש לתשלום נוסף.</p>
+                            </>
+                          )}
                         </div>
                         <div className="mt-6 border-t border-white/5 pt-4">
                           <button 

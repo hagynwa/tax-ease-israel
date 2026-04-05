@@ -363,17 +363,24 @@ export default function WizardFlow() {
             {step === 0 && ( /* omitted for brevity, handled implicitly by React state block */ 
               <motion.div key="step-0" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="space-y-6">
                 <h2 className="text-3xl font-bold text-center mb-8">מה המטרה שלנו היום?</h2>
-                <div className="flex flex-col gap-4 max-w-sm mx-auto">
-                  <button onClick={() => handleFlowSelect("refund")} className="flex flex-col items-center justify-center p-8 rounded-2xl border border-white/10 bg-white/5 hover:bg-primary/20 hover:border-primary/50 transition-all group text-center gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto">
+                  <button onClick={() => handleFlowSelect("refund")} className="flex flex-col items-center justify-center p-8 rounded-2xl border border-white/10 bg-white/5 hover:bg-blue-500/10 hover:border-blue-500/50 transition-all group text-center gap-4 relative overflow-hidden">
+                    <div className="absolute top-0 right-0 bg-blue-500 text-white text-[10px] font-bold px-3 py-1 rounded-bl-lg">פעיל כעת</div>
                     <div className="w-16 h-16 rounded-full bg-blue-500/20 text-blue-400 flex items-center justify-center group-hover:scale-110 transition-transform"><History className="w-8 h-8" /></div>
-                    <div><h3 className="text-xl font-bold mb-2">החזר מס</h3><p className="text-sm text-neutral-400">שילמתי יותר מדי מס ואני רוצה כסף חזרה.</p></div>
+                    <div><h3 className="text-xl font-bold mb-2">החזר מס</h3><p className="text-sm text-neutral-400">שילמתי יותר מדי ואני רוצה כסף חזרה.</p></div>
                   </button>
-                  {/* Disabled for MVP (Do not delete)
-                  <button onClick={() => handleFlowSelect("coordination")} className="flex flex-col items-center justify-center p-8 rounded-2xl border border-white/10 bg-white/5 hover:bg-purple-500/20 hover:border-purple-500/50 transition-all group text-center gap-4">
-                    <div className="w-16 h-16 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center group-hover:scale-110 transition-transform"><CalendarClock className="w-8 h-8" /></div>
+
+                  <div className="flex flex-col items-center justify-center p-8 rounded-2xl border border-white/5 bg-black/40 opacity-60 cursor-not-allowed text-center gap-4 relative overflow-hidden grayscale">
+                    <div className="absolute top-4 -right-10 bg-purple-500/80 text-white text-[10px] font-bold px-10 py-1 rotate-45 transform origin-center shadow-lg uppercase tracking-wider backdrop-blur-md border-y border-purple-400/30">בקרוב</div>
+                    <div className="w-16 h-16 rounded-full bg-purple-500/20 text-purple-400 flex items-center justify-center"><CalendarClock className="w-8 h-8" /></div>
                     <div><h3 className="text-xl font-bold mb-2">תיאום מס</h3><p className="text-sm text-neutral-400">מונע ניכוי מס מקסימלי השנה.</p></div>
-                  </button>
-                  */}
+                  </div>
+
+                  <div className="flex flex-col items-center justify-center p-8 rounded-2xl border border-white/5 bg-black/40 opacity-60 cursor-not-allowed text-center gap-4 relative overflow-hidden grayscale">
+                    <div className="absolute top-4 -right-10 bg-green-500/80 text-white text-[10px] font-bold px-10 py-1 rotate-45 transform origin-center shadow-lg uppercase tracking-wider backdrop-blur-md border-y border-green-400/30">בקרוב</div>
+                    <div className="w-16 h-16 rounded-full bg-green-500/20 text-green-400 flex items-center justify-center"><Building className="w-8 h-8" /></div>
+                    <div><h3 className="text-xl font-bold mb-2">מס שכר דירה</h3><p className="text-sm text-neutral-400">תשלום מס שנתי על חריגת שכירות.</p></div>
+                  </div>
                 </div>
                 
                 <div className="mt-8 text-center text-sm text-neutral-400 bg-white/5 border border-white/10 rounded-xl p-4 max-w-xl mx-auto flex items-start gap-3">

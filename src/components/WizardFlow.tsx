@@ -2,7 +2,8 @@
 
 import { useState, useMemo, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ArrowRight, History, CalendarClock, UploadCloud, FileType2, Loader2, CheckCircle2, FileDown, Info, User, GraduationCap, Baby, Award, HeartPulse, Scale, Home, Plane, Camera, Coins, ShieldCheck, MapPin, Building, CreditCard } from "lucide-react";
+import { ArrowRight, History, CalendarClock, UploadCloud, FileType2, Loader2, CheckCircle2, FileDown, Info, User, GraduationCap, Baby, Award, HeartPulse, Scale, Home, Plane, Camera, Coins, ShieldCheck, MapPin, Building, CreditCard, Share2, ExternalLink, RotateCcw, Plus, Clock } from "lucide-react";
+import ProgressBar from "./ProgressBar";
 import Link from "next/link";
 import PrintableSummary from "./PrintableSummary";
 import { calculateChildPoints } from "@/lib/taxCalculator";
@@ -126,10 +127,52 @@ export default function WizardFlow() {
   const [accountNum, setAccountNum] = useState("");
 
   const [uploadingDoc, setUploadingDoc] = useState(false);
-  const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [uploadedForms, setUploadedForms] = useState<AnalysisResult[]>([]);
   const [result, setResult] = useState<AnalysisResult | null>(null);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [showAudit, setShowAudit] = useState(false);
+  const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
+  const [pdfZoom, setPdfZoom] = useState(100);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<any[]>([]);
+  const [historySaved, setHistorySaved] = useState(false);
+
+  // Save result to Supabase history
+  const saveToHistory = async (analysisResult: AnalysisResult) => {
+    if (!user || historySaved) return;
+    try {
+      await supabase.from('tax_calculations').insert({
+        user_id: user.id,
+        tax_year: selectedYear,
+        gross_income: analysisResult.data.income,
+        tax_paid: analysisResult.data.taxPaid,
+        anticipated_refund: analysisResult.analysis.anticipatedRefund,
+        breakdown: analysisResult.analysis.breakdown,
+      });
+      setHistorySaved(true);
+    } catch (err) {
+      console.error("Failed to save to history", err);
+    }
+  };
+
+  // Fetch history from Supabase
+  const fetchHistory = async () => {
+    if (!user) return;
+    const { data } = await supabase
+      .from('tax_calculations')
+      .select('*')
+      .eq('user_id', user.id)
+      .order('created_at', { ascending: false });
+    if (data) setHistory(data);
+    setShowHistory(true);
+  };
+
+  // Auto-save to history when user is authenticated and result is available
+  useEffect(() => {
+    if (user && result && step === 5 && !historySaved) {
+      saveToHistory(result);
+    }
+  }, [user, result, step]);
   
   // Auto-Compute Periphery Benefits Based on City
   useEffect(() => {
@@ -273,8 +316,18 @@ export default function WizardFlow() {
 
       const json = await response.json();
       if (json.success) {
-        setResult(json);
-        setUploadSuccess(true);
+        const newForms = [...uploadedForms, json];
+        setUploadedForms(newForms);
+        // Compute aggregated result from all uploaded forms
+        const totalIncome = newForms.reduce((s, f) => s + (f.data?.income || 0), 0);
+        const totalTax = newForms.reduce((s, f) => s + (f.data?.taxPaid || 0), 0);
+        const totalMonths = Math.min(12, newForms.reduce((s, f) => s + (f.data?.monthsWorked || 0), 0));
+        const lastEmployer = newForms[newForms.length - 1];
+        setResult({
+          ...lastEmployer,
+          data: { ...lastEmployer.data, income: totalIncome, taxPaid: totalTax, monthsWorked: totalMonths },
+          analysis: lastEmployer.analysis,
+        });
       } else {
         alert("אירעה שגיאה: " + json.error);
       }
@@ -314,13 +367,8 @@ export default function WizardFlow() {
       
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `Official_Form_135_${selectedYear}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      window.URL.revokeObjectURL(url);
+      setPdfPreviewUrl(url);
+      nextStep(); // Move to PDF preview step
     } catch (err) {
       console.error("PDF download failed", err);
       alert("שגיאה בהורדת הקובץ");
@@ -350,18 +398,23 @@ export default function WizardFlow() {
     return docs;
   };
 
+  const shareUrl = typeof window !== 'undefined' ? window.location.origin : 'https://tax.r-hag.ai';
+  const shareText = result ? `בדקתי עכשיו ומגיע לי החזר מס של ₪${Math.floor(Math.abs(result.analysis.anticipatedRefund)).toLocaleString()}! בדקו גם אתם:` : 'בדקו כמה מגיע לכם החזר מס:';
+  const whatsappUrl = `https://wa.me/?text=${encodeURIComponent(shareText + ' ' + shareUrl)}`;
+
   return (
     <>
-      <div className="w-full max-w-3xl bg-white/5 border border-white/10 rounded-3xl p-8 backdrop-blur-xl shadow-2xl relative min-h-[400px] flex flex-col mx-auto print:hidden">
+      <div className="w-full max-w-3xl bg-white/5 border border-white/10 rounded-3xl p-4 sm:p-8 backdrop-blur-xl shadow-2xl relative min-h-[400px] flex flex-col mx-auto print:hidden">
         
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex items-center justify-between mb-2">
           {step > 0 ? (
             <button onClick={prevStep} className="p-2 rounded-full hover:bg-white/10 transition-colors text-neutral-400"><ArrowRight className="w-5 h-5" /></button>
           ) : (
             <Link href="/" className="p-2 rounded-full hover:bg-white/10 transition-colors text-neutral-400"><ArrowRight className="w-5 h-5" /></Link>
           )}
-          <div className="text-sm font-medium text-neutral-500">שלב {step + 1}</div>
+          <button onClick={() => { if(confirm('להתחיל מחדש? כל הנתונים יימחקו.')) { setStep(0); setResult(null); setUploadedForms([]); setPdfPreviewUrl(null); localStorage.removeItem(persistKey); }}} className="p-2 rounded-full hover:bg-white/10 transition-colors text-neutral-500" title="התחל מחדש"><RotateCcw className="w-4 h-4" /></button>
         </div>
+        <ProgressBar currentStep={step} totalSteps={8} />
 
         <div className="flex-1 flex flex-col justify-center">
           <AnimatePresence mode="wait">
@@ -645,30 +698,45 @@ export default function WizardFlow() {
 
             {step === 4 && (
               <motion.div key="step-upload" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="text-center space-y-6 py-4">
-                <h2 className="text-3xl font-bold mb-4">בואו נעלה את מסמכי ההכנסות</h2>
+                <h2 className="text-2xl sm:text-3xl font-bold mb-4">בואו נעלה את מסמכי ההכנסות</h2>
                 
-                <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-6 text-right max-w-lg mx-auto mb-6">
+                <div className="bg-neutral-900/50 border border-neutral-800 rounded-2xl p-4 sm:p-6 text-right max-w-lg mx-auto mb-6">
                   <h3 className="font-semibold text-blue-400 mb-2 border-b border-white/10 pb-2">מה להעלות עכשיו?</h3>
-                  <p className="text-neutral-300 mb-4 leading-relaxed">טפסי 106 מקוריים ממעסיקים, או אישורי תשלום מביטוח לאומי (לדוגמה: על דמי לידה) המעידים על הכנסה בשנת {selectedYear}.</p>
+                  <p className="text-neutral-300 mb-4 leading-relaxed text-sm">טפסי 106 מקוריים ממעסיקים, או אישורי תשלום מביטוח לאומי (לדוגמה: על דמי לידה) המעידים על הכנסה בשנת {selectedYear}.</p>
                 </div>
 
-                {!uploadSuccess ? (
-                  <div className="relative group cursor-pointer max-w-lg mx-auto">
-                    <input type="file" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" accept="image/*,.pdf" />
-                    <div className={`border-2 border-dashed rounded-3xl p-10 flex flex-col items-center justify-center transition-all duration-300 ${uploadingDoc ? 'border-blue-500 bg-blue-500/5' : 'border-white/20 bg-white/5'}`}>
-                      {uploadingDoc ? (
-                        <><Loader2 className="w-12 h-12 text-blue-500 mb-4 animate-spin" /><h3 className="text-xl font-semibold mb-1">הבינה המלאכותית מנתחת...</h3></>
-                      ) : (
-                        <><UploadCloud className="w-12 h-12 text-neutral-400 mb-4" /><h3 className="text-xl font-semibold mb-1">העלאת קובץ</h3></>
-                      )}
+                {/* Already uploaded forms list */}
+                {uploadedForms.length > 0 && (
+                  <div className="max-w-lg mx-auto space-y-2 mb-4">
+                    {uploadedForms.map((form, idx) => (
+                      <div key={idx} className="flex items-center justify-between bg-green-500/10 border border-green-500/20 rounded-xl px-4 py-3 text-right">
+                        <div>
+                          <span className="text-sm font-bold text-green-400">{form.data.employerName || `טופס ${idx + 1}`}</span>
+                          <span className="text-xs text-neutral-400 mr-3">₪{form.data.income?.toLocaleString()} | {form.data.monthsWorked} חודשים</span>
+                        </div>
+                        <CheckCircle2 className="w-5 h-5 text-green-400 flex-shrink-0" />
+                      </div>
+                    ))}
+                    <div className="text-xs text-neutral-400 text-right pt-1">
+                      סה"כ מ-{uploadedForms.length} טפסים: הכנסה ₪{uploadedForms.reduce((s, f) => s + (f.data?.income || 0), 0).toLocaleString()} | מס ₪{uploadedForms.reduce((s, f) => s + (f.data?.taxPaid || 0), 0).toLocaleString()}
                     </div>
                   </div>
-                ) : (
-                  <div className="border border-green-500/30 bg-green-500/10 rounded-3xl p-10 flex flex-col items-center justify-center max-w-lg mx-auto">
-                    <CheckCircle2 className="w-14 h-14 text-green-400 mb-4" />
-                    <h3 className="text-xl font-bold text-white mb-2">חישוב הושלם!</h3>
-                    <button onClick={nextStep} className="px-8 py-3 bg-green-500 hover:bg-green-600 text-white font-bold text-lg rounded-xl transition-colors mt-6">צפו בתוצאות השערוך</button>
+                )}
+
+                {/* Upload area */}
+                <div className="relative group cursor-pointer max-w-lg mx-auto">
+                  <input type="file" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" accept="image/*,.pdf" />
+                  <div className={`border-2 border-dashed rounded-3xl p-8 sm:p-10 flex flex-col items-center justify-center transition-all duration-300 ${uploadingDoc ? 'border-blue-500 bg-blue-500/5' : 'border-white/20 bg-white/5'}`}>
+                    {uploadingDoc ? (
+                      <><Loader2 className="w-12 h-12 text-blue-500 mb-4 animate-spin" /><h3 className="text-lg sm:text-xl font-semibold mb-1">הבינה המלאכותית מנתחת...</h3></>
+                    ) : (
+                      <><UploadCloud className="w-12 h-12 text-neutral-400 mb-4" /><h3 className="text-lg sm:text-xl font-semibold mb-1">{uploadedForms.length > 0 ? 'הוסף טופס 106 נוסף' : 'העלאת קובץ'}</h3><p className="text-xs text-neutral-500">ניתן להעלות מספר טפסי 106 ממעסיקים שונים</p></>
+                    )}
                   </div>
+                </div>
+
+                {uploadedForms.length > 0 && (
+                  <button onClick={nextStep} className="px-8 py-3 bg-green-500 hover:bg-green-600 text-white font-bold text-lg rounded-xl transition-colors mt-4 inline-flex items-center gap-2">צפו בתוצאות השערוך <ArrowRight className="w-4 h-4 rotate-180" /></button>
                 )}
               </motion.div>
             )}
@@ -710,9 +778,38 @@ export default function WizardFlow() {
                   /* UNLOCKED RESULTS */
                   <>
                     <div className="text-center mb-8">
-                      <h2 className="text-4xl font-bold mb-2">שקלול החזר מס רשמי</h2>
-                      <p className="text-neutral-400">שלום {user.user_metadata?.full_name || user.email}, התוצאה נמדדת משפטית לחוקי המס של {selectedYear}.</p>
+                      <h2 className="text-2xl sm:text-4xl font-bold mb-2">שקלול החזר מס רשמי</h2>
+                      <p className="text-neutral-400 text-sm">שלום {user.user_metadata?.full_name || user.email}, התוצאה נמדדת לפי חוקי המס של {selectedYear}.</p>
+                      <button onClick={fetchHistory} className="mt-3 text-xs text-blue-400 hover:underline inline-flex items-center gap-1"><Clock className="w-3 h-3" /> היסטוריית חישובים</button>
                     </div>
+
+                    {/* History Modal */}
+                    {showHistory && (
+                      <div className="fixed inset-0 bg-black/70 z-50 flex items-center justify-center p-4" onClick={() => setShowHistory(false)}>
+                        <div className="bg-neutral-900 border border-white/10 rounded-2xl p-6 max-w-lg w-full max-h-[70vh] overflow-auto" onClick={e => e.stopPropagation()}>
+                          <h3 className="text-xl font-bold mb-4 text-right">היסטוריית חישובים</h3>
+                          {history.length === 0 ? (
+                            <p className="text-neutral-400 text-sm text-center py-8">אין חישובים קודמים.</p>
+                          ) : (
+                            <div className="space-y-3">
+                              {history.map((h: any) => (
+                                <div key={h.id} className="flex items-center justify-between bg-black/40 p-4 rounded-xl border border-white/5">
+                                  <div className="text-right">
+                                    <div className="font-bold text-sm">שנת מס {h.tax_year}</div>
+                                    <div className="text-xs text-neutral-400">הכנסה: ₪{Number(h.gross_income).toLocaleString()} | מס: ₪{Number(h.tax_paid).toLocaleString()}</div>
+                                    <div className="text-xs text-neutral-500">{new Date(h.created_at).toLocaleDateString('he-IL')}</div>
+                                  </div>
+                                  <div className={`text-lg font-black ${Number(h.anticipated_refund) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                                    ₪{Math.floor(Math.abs(Number(h.anticipated_refund))).toLocaleString()}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                          <button onClick={() => setShowHistory(false)} className="mt-4 w-full py-2 bg-white/10 rounded-xl text-sm hover:bg-white/20">סגור</button>
+                        </div>
+                      </div>
+                    )}
 
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
                       <div className="bg-neutral-900/60 p-6 rounded-2xl border border-white/5 flex flex-col justify-between">
@@ -785,10 +882,13 @@ export default function WizardFlow() {
                       </div>
                     </div>
 
-                    <div className="pt-6 border-t border-white/10 text-left">
+                    <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
                       <button onClick={nextStep} className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors inline-flex items-center gap-2">
                         המשך למילוי טופס 135 הרשמי <ArrowRight className="w-4 h-4 rotate-180" />
                       </button>
+                      <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold flex items-center gap-2 text-sm">
+                        <Share2 className="w-4 h-4" /> שתף ב-WhatsApp
+                      </a>
                     </div>
                   </>
                 )}

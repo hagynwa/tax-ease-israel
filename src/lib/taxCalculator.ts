@@ -214,9 +214,16 @@ export function calculateTaxRefund(
 
   breakdown.push(`סה"כ מס תיאורטי לפני הנחות: ₪${Math.floor(taxOwed).toLocaleString()}`);
 
+  // Detailed credit point breakdown
+  const pointValueMonthly = CREDIT_POINT_VALUES[year] || 242;
+  breakdown.push(`--- פירוט נקודות זיכוי ---`);
+  breakdown.push(`ערך נקודת זיכוי חודשית (${year}): ₪${pointValueMonthly}`);
+  breakdown.push(`ערך נקודת זיכוי שנתית: ₪${pointValueMonthly} × 12 = ₪${pointValueAnnual.toLocaleString()}`);
+  breakdown.push(`סה"כ נקודות זיכוי אישיות: ${effectivePoints.toFixed(2)} (מתוכן ${userPoints.toFixed(2)} לפני דחייה${options.deferredPoint ? ', הופחתה 1 נקודה' : ''})`);
+
   // Credit points are NOT pro-rata — they apply for the full year regardless of months worked
   const pointsCredit = effectivePoints * pointValueAnnual;
-  breakdown.push(`קיזוז נקודות זיכוי אישיות (${effectivePoints.toFixed(2)} × ₪${pointValueAnnual.toLocaleString()}): -₪${Math.floor(pointsCredit).toLocaleString()}`);
+  breakdown.push(`קיזוז נקודות זיכוי: ${effectivePoints.toFixed(2)} × ₪${pointValueAnnual.toLocaleString()} = -₪${Math.floor(pointsCredit).toLocaleString()}`);
   taxOwed = Math.max(0, taxOwed - pointsCredit);
 
   if (options.peripheryPercent > 0 && options.peripheryCeiling > 0) {

@@ -8,6 +8,7 @@ import Link from "next/link";
 import PrintableSummary from "./PrintableSummary";
 import { calculateChildPoints } from "@/lib/taxCalculator";
 import { getPeripheryBenefitByCity } from "@/lib/peripheryMap";
+import { BANKS, getBranchesForBank } from "@/lib/bankData";
 import { createClient } from "@/utils/supabase/client";
 
 type FlowType = "none" | "refund" | "coordination";
@@ -136,6 +137,10 @@ export default function WizardFlow() {
   const [showAudit, setShowAudit] = useState(false);
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfZoom, setPdfZoom] = useState(100);
+  const [bankSearch, setBankSearch] = useState("");
+  const [branchSearch, setBranchSearch] = useState("");
+  const [showBankDropdown, setShowBankDropdown] = useState(false);
+  const [showBranchDropdown, setShowBranchDropdown] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<any[]>([]);
   const [historySaved, setHistorySaved] = useState(false);
@@ -971,15 +976,57 @@ export default function WizardFlow() {
                   {/* Bank Details */}
                   <div className="space-y-4 bg-black/20 p-5 rounded-2xl border border-white/5 md:col-span-2">
                     <h3 className="font-bold flex items-center gap-2 text-white/80"><Building className="w-4 h-4" /> פרטי חשבון בנק (לאן יועבר ההחזר?)</h3>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="text-xs text-neutral-400 block mb-1">קוד בנק</label>
-                        <input type="text" value={bankId} onChange={e => setBankId(e.target.value)} placeholder="למשל 12" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors text-center" />
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      {/* Bank Selector */}
+                      <div className="relative">
+                        <label className="text-xs text-neutral-400 block mb-1">בנק</label>
+                        <input 
+                          type="text" 
+                          value={bankSearch || (bankId ? BANKS.find(b => b.code === bankId)?.name || bankId : '')}
+                          onChange={e => { setBankSearch(e.target.value); setShowBankDropdown(true); }}
+                          onFocus={() => { setBankSearch(''); setShowBankDropdown(true); }}
+                          placeholder="חפשו בנק..."
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors text-sm"
+                        />
+                        {showBankDropdown && (
+                          <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-neutral-900 border border-white/10 rounded-xl max-h-48 overflow-auto shadow-xl">
+                            {BANKS.filter(b => !bankSearch || b.name.includes(bankSearch) || b.code.includes(bankSearch)).map(bank => (
+                              <button key={bank.code} onClick={() => { setBankId(bank.code); setBankSearch(''); setBranchId(''); setShowBankDropdown(false); }} className="w-full text-right px-3 py-2 hover:bg-white/10 text-sm flex items-center justify-between">
+                                <span>{bank.name}</span>
+                                <span className="text-xs text-neutral-500">{bank.code}</span>
+                              </button>
+                            ))}
+                          </div>
+                        )}
                       </div>
-                      <div>
-                        <label className="text-xs text-neutral-400 block mb-1">מספר סניף</label>
-                        <input type="text" value={branchId} onChange={e => setBranchId(e.target.value)} placeholder="למשל 112" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors text-center" />
+
+                      {/* Branch Selector */}
+                      <div className="relative">
+                        <label className="text-xs text-neutral-400 block mb-1">סניף</label>
+                        <input 
+                          type="text" 
+                          value={branchSearch || (branchId ? (getBranchesForBank(bankId).find(b => b.branchCode === branchId)?.name || branchId) : '')}
+                          onChange={e => { setBranchSearch(e.target.value); setShowBranchDropdown(true); }}
+                          onFocus={() => { setBranchSearch(''); setShowBranchDropdown(true); }}
+                          placeholder={bankId ? 'חפשו סניף...' : 'בחרו בנק קודם'}
+                          disabled={!bankId}
+                          className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors text-sm disabled:opacity-40"
+                        />
+                        {showBranchDropdown && bankId && (
+                          <div className="absolute z-30 top-full left-0 right-0 mt-1 bg-neutral-900 border border-white/10 rounded-xl max-h-48 overflow-auto shadow-xl">
+                            {getBranchesForBank(bankId).filter(b => !branchSearch || b.name.includes(branchSearch) || b.branchCode.includes(branchSearch) || b.city.includes(branchSearch)).map(branch => (
+                              <button key={branch.branchCode} onClick={() => { setBranchId(branch.branchCode); setBranchSearch(''); setShowBranchDropdown(false); }} className="w-full text-right px-3 py-2 hover:bg-white/10 text-sm flex items-center justify-between">
+                                <span>{branch.name} - {branch.city}</span>
+                                <span className="text-xs text-neutral-500">{branch.branchCode}</span>
+                              </button>
+                            ))}
+                            {getBranchesForBank(bankId).length === 0 && (
+                              <div className="px-3 py-2 text-xs text-neutral-500">אין סניפים במאגר — הזינו מספר סניף ידנית</div>
+                            )}
+                          </div>
+                        )}
                       </div>
+
                       <div>
                         <label className="text-xs text-neutral-400 block mb-1">מספר חשבון בנק</label>
                         <input type="text" value={accountNum} onChange={e => setAccountNum(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors text-center" />

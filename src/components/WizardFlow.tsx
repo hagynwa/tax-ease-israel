@@ -944,17 +944,17 @@ export default function WizardFlow() {
                     <h3 className="font-bold flex items-center gap-2 text-white/80"><User className="w-4 h-4" /> זהות</h3>
                     <div className="grid grid-cols-2 gap-3">
                       <div>
-                        <label className="text-xs text-neutral-400 block mb-1">שם משפחה</label>
-                        <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors" />
+                        <label className="text-xs text-neutral-400 block mb-1">שם משפחה <span className="text-red-400">*</span></label>
+                        <input type="text" value={lastName} onChange={e => setLastName(e.target.value)} className={`w-full bg-white/5 border rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors ${!lastName ? 'border-red-500/50' : 'border-white/10'}`} />
                       </div>
                       <div>
-                        <label className="text-xs text-neutral-400 block mb-1">שם פרטי</label>
-                        <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors" />
+                        <label className="text-xs text-neutral-400 block mb-1">שם פרטי <span className="text-red-400">*</span></label>
+                        <input type="text" value={firstName} onChange={e => setFirstName(e.target.value)} className={`w-full bg-white/5 border rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors ${!firstName ? 'border-red-500/50' : 'border-white/10'}`} />
                       </div>
                     </div>
                     <div>
-                      <label className="text-xs text-neutral-400 block mb-1">מספר תעודת זהות (9 ספרות)</label>
-                      <input type="text" value={idNumber} onChange={e => setIdNumber(e.target.value)} maxLength={9} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors text-left" dir="ltr" />
+                      <label className="text-xs text-neutral-400 block mb-1">מספר תעודת זהות (9 ספרות) <span className="text-red-400">*</span></label>
+                      <input type="text" value={idNumber} onChange={e => setIdNumber(e.target.value)} maxLength={9} className={`w-full bg-white/5 border rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors text-left ${!idNumber ? 'border-red-500/50' : 'border-white/10'}`} dir="ltr" />
                     </div>
                   </div>
 
@@ -963,16 +963,16 @@ export default function WizardFlow() {
                     <h3 className="font-bold flex items-center gap-2 text-white/80"><MapPin className="w-4 h-4" /> התקשרות וכתובת</h3>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="col-span-2">
-                        <label className="text-xs text-neutral-400 block mb-1">יישוב מגורים</label>
-                        <input type="text" value={city} onChange={e => setCity(e.target.value)} placeholder="לדוגמה: תל אביב" className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors" />
+                        <label className="text-xs text-neutral-400 block mb-1">יישוב מגורים <span className="text-red-400">*</span></label>
+                        <input type="text" value={city} onChange={e => setCity(e.target.value)} placeholder="לדוגמה: תל אביב" className={`w-full bg-white/5 border rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors ${!city ? 'border-red-500/50' : 'border-white/10'}`} />
                       </div>
                       <div>
-                        <label className="text-xs text-neutral-400 block mb-1">רחוב ומספר בית</label>
-                        <input type="text" value={street} onChange={e => setStreet(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors" />
+                        <label className="text-xs text-neutral-400 block mb-1">רחוב ומספר בית <span className="text-red-400">*</span></label>
+                        <input type="text" value={street} onChange={e => setStreet(e.target.value)} className={`w-full bg-white/5 border rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors ${!street ? 'border-red-500/50' : 'border-white/10'}`} />
                       </div>
                       <div>
-                        <label className="text-xs text-neutral-400 block mb-1">טלפון נייד</label>
-                        <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors text-left" dir="ltr" />
+                        <label className="text-xs text-neutral-400 block mb-1">טלפון נייד <span className="text-red-400">*</span></label>
+                        <input type="tel" value={phone} onChange={e => setPhone(e.target.value)} className={`w-full bg-white/5 border rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors text-left ${!phone ? 'border-red-500/50' : 'border-white/10'}`} dir="ltr" />
                       </div>
                     </div>
                   </div>
@@ -1032,8 +1032,8 @@ export default function WizardFlow() {
                       </div>
 
                       <div>
-                        <label className="text-xs text-neutral-400 block mb-1">מספר חשבון בנק</label>
-                        <input type="text" value={accountNum} onChange={e => setAccountNum(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors text-center" />
+                        <label className="text-xs text-neutral-400 block mb-1">מספר חשבון בנק <span className="text-red-400">*</span></label>
+                        <input type="text" value={accountNum} onChange={e => setAccountNum(e.target.value)} className={`w-full bg-white/5 border rounded-lg px-3 py-2 outline-none focus:border-blue-500 transition-colors text-center ${!accountNum ? 'border-red-500/50' : 'border-white/10'}`} />
                       </div>
                     </div>
                   </div>
@@ -1043,8 +1043,11 @@ export default function WizardFlow() {
                    <div className="text-right">
                      <h4 className="font-bold text-lg mb-1">חולל טופס 135 סופי להתקשרות</h4>
                      <p className="text-sm text-neutral-400 mt-1">המערכת צורבת את נתוני הזהות, החישוב והבנק למקומות המדויקים בPDF בפיקסלים.</p>
+                     {(!lastName || !firstName || !idNumber || !city || !street || !phone || !bankId || !branchId || !accountNum) && (
+                       <p className="text-xs text-red-400 mt-2">⚠ יש למלא את כל השדות לפני הורדת הטופס.</p>
+                     )}
                    </div>
-                   <button onClick={handlePdfDownload} disabled={downloadingPdf} className="flex-shrink-0 px-8 py-4 bg-green-500 hover:bg-green-400 text-white rounded-xl font-bold flex items-center gap-3">
+                   <button onClick={handlePdfDownload} disabled={downloadingPdf || !lastName || !firstName || !idNumber || !city || !street || !phone || !bankId || !branchId || !accountNum} className="flex-shrink-0 px-8 py-4 bg-green-500 hover:bg-green-400 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl font-bold flex items-center gap-3 transition-opacity">
                       {downloadingPdf ? <Loader2 className="w-5 h-5 animate-spin" /> : <FileDown className="w-5 h-5" />} הורד מסמך PDF מוכן
                    </button>
                 </div>

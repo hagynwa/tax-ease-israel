@@ -68,7 +68,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: `No historical PDF form mapped for year ${year}` }, { status: 404 });
     }
 
-    const formPath = join(process.cwd(), 'public', fileName);
+    const formPath = join(/* turbopackIgnore: true */ process.cwd(), 'public', fileName);
     let pdfDoc;
 
     if (existsSync(formPath)) {
@@ -80,8 +80,8 @@ export async function POST(req: NextRequest) {
       
       let font;
       const fontCandidates = [
-        join(process.cwd(), 'public', 'fonts', 'Heebo-SemiBold.ttf'),
-        join(process.cwd(), 'public', 'fonts', 'Assistant-SemiBold.ttf'),
+        join(/* turbopackIgnore: true */ process.cwd(), 'public', 'fonts', 'Heebo-SemiBold.ttf'),
+        join(/* turbopackIgnore: true */ process.cwd(), 'public', 'fonts', 'Assistant-SemiBold.ttf'),
       ];
       let fontLoaded = false;
       for (const fontPath of fontCandidates) {
@@ -138,8 +138,9 @@ export async function POST(req: NextRequest) {
           y: activeCoords.idNumber.y,
           size: 10,
           font,
-          characterSpacing: 6 // Calibrated for ID boxes
-        });
+          // @ts-ignore - characterSpacing exists in pdf-lib 1.17+ but might missing in some type definitions
+          characterSpacing: 6 
+        } as any);
       }
 
       drawTextAt(personalData.firstName, activeCoords.firstName);

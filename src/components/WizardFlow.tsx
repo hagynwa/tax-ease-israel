@@ -107,6 +107,7 @@ export default function WizardFlow() {
   // Maternity & Birth
   const [gaveBirthThisYear, setGaveBirthThisYear] = useState(false);
   const [maternityAllowance, setMaternityAllowance] = useState<number>(0);
+  const [uploadingMaternity, setUploadingMaternity] = useState(false);
   const [unpaidLeaveMonths, setUnpaidLeaveMonths] = useState<number>(0);
   const [deferredPoint, setDeferredPoint] = useState(false);
   
@@ -568,6 +569,43 @@ export default function WizardFlow() {
                                 placeholder="לדוגמה: 35,000"
                                 className="w-full bg-transparent border-none outline-none text-white font-bold text-left"
                               />
+                            </div>
+                          </div>
+
+                          {/* Upload Bituach Leumi Document */}
+                          <div className="relative group cursor-pointer">
+                            <input 
+                              type="file" 
+                              accept="image/*,.pdf"
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                setUploadingMaternity(true);
+                                try {
+                                  const fd = new FormData();
+                                  fd.append("file", file);
+                                  fd.append("type", "maternity");
+                                  const res = await fetch("/api/extract-maternity", { method: "POST", body: fd });
+                                  const json = await res.json();
+                                  if (json.success && json.amount > 0) {
+                                    setMaternityAllowance(json.amount);
+                                  } else {
+                                    alert(json.error || "לא הצלחנו לחלץ את הסכום מהמסמך. נסו להזין ידנית.");
+                                  }
+                                } catch {
+                                  alert("שגיאת רשת");
+                                } finally {
+                                  setUploadingMaternity(false);
+                                }
+                              }}
+                            />
+                            <div className={`border border-dashed rounded-xl p-3 flex items-center justify-center gap-2 transition-all text-sm ${uploadingMaternity ? 'border-pink-500 bg-pink-500/5' : 'border-white/10 bg-black/20 hover:bg-black/30'}`}>
+                              {uploadingMaternity ? (
+                                <><Loader2 className="w-4 h-4 text-pink-400 animate-spin" /> <span className="text-pink-300">מחלץ נתונים מהמסמך...</span></>
+                              ) : (
+                                <><UploadCloud className="w-4 h-4 text-neutral-400" /> <span className="text-neutral-400">או: העלו אישור דמי לידה מביטוח לאומי</span></>
+                              )}
                             </div>
                           </div>
 

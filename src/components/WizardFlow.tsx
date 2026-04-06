@@ -654,6 +654,10 @@ export default function WizardFlow() {
                      <h2 className="text-3xl font-bold mb-2">השכלה והטבות כספיות</h2>
                      <p className="text-neutral-400 text-sm">המערכת תחשב זיכויים לסטודנטים, ביטוחים, ופריפריה.</p>
                    </div>
+                   <div className="bg-blue-500/20 border border-blue-500/30 text-blue-400 px-4 py-2 rounded-xl text-center flex-shrink-0">
+                     <span className="block text-xs uppercase font-bold tracking-wider">נקודות</span>
+                     <span className="text-2xl font-black">{calculatedPoints}</span>
+                   </div>
                 </div>
 
                 <div className="space-y-6 bg-black/20 p-6 rounded-2xl border border-white/5">

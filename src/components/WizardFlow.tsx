@@ -30,6 +30,8 @@ interface AnalysisResult {
 }
 
 const persistKey = "tax_ease_wizard_state";
+// Set to true to bypass auth during testing. Set to false in production.
+const BYPASS_AUTH = true;
 
 export default function WizardFlow() {
   const supabase = createClient();
@@ -744,43 +746,13 @@ export default function WizardFlow() {
             {/* STEP 5: Results */}
             {step === 5 && result && (
                <motion.div key="step-results" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="w-full text-right">
-                {!user ? (
-                  /* LOCKED GATEWAY */
-                  <div className="max-w-xl mx-auto text-center py-12 px-6 bg-white/5 border border-white/10 rounded-3xl backdrop-blur-md relative overflow-hidden">
-                    <div className="absolute -top-24 -left-24 w-48 h-48 bg-blue-500/20 blur-[60px] rounded-full" />
-                    <div className="absolute -bottom-24 -right-24 w-48 h-48 bg-purple-500/20 blur-[60px] rounded-full" />
-                    
-                    <div className="w-20 h-20 bg-blue-500/10 rounded-2xl flex items-center justify-center mx-auto mb-6 text-blue-400 border border-blue-500/20">
-                      <ShieldCheck className="w-10 h-10" />
-                    </div>
-                    
-                    <h2 className="text-3xl font-black mb-4">התוצאות שלך מוכנות!</h2>
-                    <p className="text-neutral-300 mb-8 leading-relaxed">
-                      כדי לצפות בשווי החזר המס המדויק שלך ולשמור את הנתונים לעדכון עתידי, עליך להתחבר באמצעות חשבון Google. 
-                      <br />
-                      <span className="text-blue-400 font-semibold italic text-sm">(התהליך לוקח 5 שניות בלבד)</span>
-                    </p>
-                    
-                    <button 
-                      onClick={handleLogin}
-                      className="w-full h-14 bg-white text-black rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-neutral-200 transition-all shadow-xl"
-                    >
-                      <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-6 h-6" alt="Google" />
-                      התחבר עם Google וחשוף את ההחזר שלי
-                    </button>
-                    
-                    <div className="mt-8 flex items-center justify-center gap-6 text-xs text-neutral-500">
-                      <div className="flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> מאובטח SSL</div>
-                      <div className="flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> פרטיות מובטחת</div>
-                    </div>
-                  </div>
-                ) : (
-                  /* UNLOCKED RESULTS */
                   <>
                     <div className="text-center mb-8">
                       <h2 className="text-2xl sm:text-4xl font-bold mb-2">שקלול החזר מס רשמי</h2>
-                      <p className="text-neutral-400 text-sm">שלום {user.user_metadata?.full_name || user.email}, התוצאה נמדדת לפי חוקי המס של {selectedYear}.</p>
-                      <button onClick={fetchHistory} className="mt-3 text-xs text-blue-400 hover:underline inline-flex items-center gap-1"><Clock className="w-3 h-3" /> היסטוריית חישובים</button>
+                      <p className="text-neutral-400 text-sm">התוצאה נמדדת לפי חוקי המס של {selectedYear}.</p>
+                      {user && (
+                        <button onClick={fetchHistory} className="mt-3 text-xs text-blue-400 hover:underline inline-flex items-center gap-1"><Clock className="w-3 h-3" /> היסטוריית חישובים</button>
+                      )}
                     </div>
 
                     {/* History Modal */}
@@ -833,10 +805,9 @@ export default function WizardFlow() {
                         <div className="mt-6 border-t border-white/5 pt-4">
                           <button 
                             onClick={() => setShowAudit(!showAudit)}
-                            className="w-full py-2 bg-white/5 hover:bg-white/10 rounded-lg text-sm text-neutral-300 font-bold transition-colors flex justify-center items-center gap-2"
+                            className="text-sm text-blue-400 underline hover:text-blue-300 transition-colors"
                           >
-                            <Info className="w-4 h-4" />
-                            {showAudit ? "הסתר פירוט נתונים וחישוב" : "הצג פירוט נתונים וחישוב (לצרכי בקרה)"}
+                            {showAudit ? 'הסתר פירוט חישוב' : 'הצג פירוט חישוב מלא'}
                           </button>
                           
                           <AnimatePresence>
@@ -882,17 +853,34 @@ export default function WizardFlow() {
                       </div>
                     </div>
 
-                    <div className="pt-6 border-t border-white/10 flex flex-col sm:flex-row items-center justify-between gap-3">
-                      <button onClick={nextStep} className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors inline-flex items-center gap-2">
-                        המשך למילוי טופס 135 הרשמי <ArrowRight className="w-4 h-4 rotate-180" />
-                      </button>
-                      <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold flex items-center gap-2 text-sm">
-                        <Share2 className="w-4 h-4" /> שתף ב-WhatsApp
-                      </a>
+                    {/* AUTH + PAYMENT GATE: Continue to Form 135 */}
+                    <div className="pt-6 border-t border-white/10">
+                      {(user || BYPASS_AUTH) ? (
+                        <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+                          <button onClick={nextStep} className="px-8 py-3 bg-blue-600 hover:bg-blue-500 text-white font-bold rounded-xl transition-colors inline-flex items-center gap-2">
+                            המשך למילוי טופס 135 הרשמי <ArrowRight className="w-4 h-4 rotate-180" />
+                          </button>
+                          <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold flex items-center gap-2 text-sm">
+                            <Share2 className="w-4 h-4" /> שתף ב-WhatsApp
+                          </a>
+                        </div>
+                      ) : (
+                        <div className="max-w-md mx-auto text-center py-6 px-6 bg-white/5 border border-white/10 rounded-2xl backdrop-blur-md">
+                          <h3 className="text-xl font-bold mb-3">רוצים לקבל את הטופס המוכן?</h3>
+                          <p className="text-sm text-neutral-400 mb-4">התחברו כדי לקבל טופס 135 מוכן להגשה + הנחיות לקבלת ההחזר.</p>
+                          <button 
+                            onClick={handleLogin}
+                            className="w-full h-12 bg-white text-black rounded-xl font-bold flex items-center justify-center gap-3 hover:bg-neutral-200 transition-all shadow-lg mb-3"
+                          >
+                            <img src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg" className="w-5 h-5" alt="Google" />
+                            התחבר עם Google
+                          </button>
+                          <p className="text-xs text-neutral-500">לאחר ההתחברות תועברו לתשלום וקבלת הטופס.</p>
+                        </div>
+                      )}
                     </div>
                   </>
-                )}
-             </motion.div>
+              </motion.div>
             )}
 
             {/* STEP 6: PERSONAL DATA CAPTURE -> PDF DOWNLAD */}

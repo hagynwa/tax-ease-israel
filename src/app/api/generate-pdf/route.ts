@@ -75,12 +75,26 @@ export async function POST(req: NextRequest) {
       pdfDoc.registerFontkit(fontkit);
       
       let font;
-      const fontPath = join(process.cwd(), 'public', 'fonts', 'Assistant-SemiBold.ttf');
-      if (existsSync(fontPath)) {
-        const fontBytes = readFileSync(fontPath);
-        font = await pdfDoc.embedFont(fontBytes);
-      } else {
-        throw new Error("Hebrew Font not found at " + fontPath);
+      // Try Heebo (static, guaranteed pdf-lib compatible), then fall back to Assistant
+      const fontCandidates = [
+        join(process.cwd(), 'public', 'fonts', 'Heebo-SemiBold.ttf'),
+        join(process.cwd(), 'public', 'fonts', 'Assistant-SemiBold.ttf'),
+      ];
+      let fontLoaded = false;
+      for (const fontPath of fontCandidates) {
+        if (existsSync(fontPath)) {
+          try {
+            const fontBytes = readFileSync(fontPath);
+            font = await pdfDoc.embedFont(fontBytes);
+            fontLoaded = true;
+            break;
+          } catch (e: any) {
+            console.warn(`Font at ${fontPath} failed to embed: ${e.message}, trying next...`);
+          }
+        }
+      }
+      if (!fontLoaded || !font) {
+        throw new Error("No compatible Hebrew font found in public/fonts/");
       }
 
       const renderConfig = { size: 10, font, color: rgb(0, 0, 0) };

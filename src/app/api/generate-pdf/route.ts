@@ -17,41 +17,45 @@ const FORM_MAP: Record<number, string> = {
 };
 
 /**
- * PDF Coordinate Mapping Grid (Postscript Pixels)
- * Form 135 Gov.il - 2024 baseline.
+ * PDF Coordinate Mapping Grid (PostScript Points)
+ * Recalibrated using official 2024 Form 135 and grid overlay.
+ * Page size: 595 x 842. (y=0 is BOTTOM)
  * 
- * Target X/Y pixels have been mathematically calibrated based on physical A4 scale (595x841).
+ * Coordinates target the CENTER/RIGHT of the input areas to ensure 
+ * Hebrew text (rendered LTR by pdf-lib) aligns naturally with the labels.
  */
+
 const BASE_COORDS = {
-  // Identity Block (Page 1)
-  idNumber: { page: 0, x: 440, y: 645 },  // Box 'מספר זהות'
-  firstName: { page: 0, x: 300, y: 630 },
-  lastName: { page: 0, x: 450, y: 630 },
-  phone: { page: 0, x: 380, y: 520 },     // Box 'מספר טלפון נייד'
-  city: { page: 0, x: 450, y: 485 },
+  // --- Section B: Personal Details (First Person / Right Side) ---
+  idNumber:    { page: 0, x: 440, y: 665 },  // Centered in the 9-digit box area
+  lastName:    { page: 0, x: 380, y: 625 },  // "שם משפחה"
+  firstName:   { page: 0, x: 260, y: 625 },  // "שם פרטי"
+  
+  city:        { page: 0, x: 440, y: 570 },  // "יישוב"
+  street:      { page: 0, x: 320, y: 570 },  // "רחוב"
+  phone:       { page: 0, x: 480, y: 530 },  // "מספר טלפון נייד"
 
-  // Bank Info (Page 1 - Middle)
-  bankId: { page: 0, x: 535, y: 423 },    // Box 'קוד בנק' (278)
-  branchId: { page: 0, x: 480, y: 423 },  // Box 'סמל סניף'
-  accountNum: { page: 0, x: 360, y: 423 },// Box 'מספר חשבון' (277)
+  // --- Bank Details (Section B Bottom) ---
+  bankId:      { page: 0, x: 530, y: 440 },  // Box 278 (קוד בנק)
+  branchId:    { page: 0, x: 480, y: 440 },  // Box (סמל סניף)
+  accountNum:  { page: 0, x: 360, y: 440 },  // Box 277 (מספר חשבון)
 
-  // Tax/Income Maths (Section 158/042)
-  income: { page: 0, x: 170, y: 315 },    // Page 1, Section D, Box 158
-  taxPaid: { page: 1, x: 170, y: 505 },   // Page 2, Section T, Box 042
-  employerId: { page: 0, x: 460, y: 315 }, // Box 150
-};
+  // --- Section D: Income Table (Page 1) ---
+  income:      { page: 0, x: 135, y: 340 },  // Box 158 (Salary)
+  employerId:  { page: 0, x: 435, y: 340 },  // Box 150 (Employer ID)
+  
+  // --- Section 55: Tax Paid (Page 2) ---
+  taxPaid:     { page: 1, x: 135, y: 505 },  // Box 042 (Tax withheld)
 
-// Architecture allowing specific Y/X offsets per tax year (as forms slightly change every year)
-// Currently all mapped to the 2024 baseline. Can be fine-tuned manually later.
-const COORDS_BY_YEAR: Record<number, typeof BASE_COORDS> = {
-  2026: { ...BASE_COORDS },
-  2025: { ...BASE_COORDS },
-  2024: { ...BASE_COORDS },
-  2023: { ...BASE_COORDS },
-  2022: { ...BASE_COORDS },
-  2021: { ...BASE_COORDS },
-  2020: { ...BASE_COORDS },
-  2019: { ...BASE_COORDS },
+  // --- Checkboxes (Page 1 Top) ---
+  checkIncomeOnly: { page: 0, x: 434, y: 770 }, // "הכנסותי בלבד"
+  checkRefund:     { page: 0, x: 364, y: 770 }, // "בקשה להחזר מס"
+  
+  // Marital Status (Row y=670)
+  checkSingle:   { page: 0, x: 258, y: 670 },
+  checkMarried:  { page: 0, x: 185, y: 670 },
+  checkDivorced: { page: 0, x: 112, y: 670 },
+  checkWidowed:  { page: 0, x: 42,  y: 670 },
 };
 
 export async function POST(req: NextRequest) {
@@ -75,7 +79,6 @@ export async function POST(req: NextRequest) {
       pdfDoc.registerFontkit(fontkit);
       
       let font;
-      // Try Heebo (static, guaranteed pdf-lib compatible), then fall back to Assistant
       const fontCandidates = [
         join(process.cwd(), 'public', 'fonts', 'Heebo-SemiBold.ttf'),
         join(process.cwd(), 'public', 'fonts', 'Assistant-SemiBold.ttf'),
@@ -97,51 +100,80 @@ export async function POST(req: NextRequest) {
         throw new Error("No compatible Hebrew font found in public/fonts/");
       }
 
-      const renderConfig = { size: 10, font, color: rgb(0, 0, 0) };
+      const textConfig = { size: 10, font, color: rgb(0, 0, 0) };
+      const checkConfig = { size: 12, font, color: rgb(0, 0, 0) };
 
-      const reverseHebrew = (str: string) => {
-        return String(str).split(' ').reverse().map(word => {
-          if (/^[0-9A-Za-z.\-\/]+$/.test(word)) return word;
-          return word.split('').reverse().join('');
-        }).join(' ');
+      /**
+       * Writing Hebrew to PDF:
+       * pdf-lib renders text LTR in the character sequence provided.
+       * The user confirmed that manual reversal ("יגח" instead of "חגי") 
+       * results in inverted text in the viewer. 
+       * 
+       * Therefore, we write Hebrew text in its logical order (LTR sequence).
+       */
+      const drawTextAt = (val: any, coord: { page: number, x: number, y: number } | undefined, config = textConfig) => {
+        if (val && coord && pages[coord.page]) {
+          const text = String(val);
+          // For Hebrew names, we might want to offset slightly to align right if they vary in length
+          // but for now we use fixed X coordinates based on grid.
+          pages[coord.page].drawText(text, { x: coord.x, y: coord.y, ...config });
+        }
       };
 
-      const writeData = (val: any, coord: { page: number, x: number, y: number } | undefined) => {
-         if (val && coord && pages[coord.page]) {
-           const reversed = reverseHebrew(val); 
-           pages[coord.page].drawText(reversed, { x: coord.x, y: coord.y, ...renderConfig });
-         }
+      const drawCheckAt = (coord: { page: number, x: number, y: number } | undefined) => {
+        if (coord && pages[coord.page]) {
+          pages[coord.page].drawText("X", { x: coord.x, y: coord.y, ...checkConfig });
+        }
       };
 
-      const computedTaxData = data.data || {}; 
+      const computedTaxData = data.data || {};
       const personalData = data.personalData || {};
+      const activeCoords = BASE_COORDS; // Currently 2024 baseline
 
-      // Get year-specific coordinates or fallback to baseline
-      const activeCoords = COORDS_BY_YEAR[year as number] || BASE_COORDS;
+      // Personal Info
+      // For ID, we use character spacing to align with boxes
+      if (personalData.idNumber && activeCoords.idNumber) {
+        pages[0].drawText(String(personalData.idNumber), {
+          x: activeCoords.idNumber.x,
+          y: activeCoords.idNumber.y,
+          size: 10,
+          font,
+          characterSpacing: 6 // Calibrated for ID boxes
+        });
+      }
 
-      // Render Identity (Numbers Only - Hebrew Text stripped for now)
-      writeData(personalData.idNumber, activeCoords.idNumber);
-      writeData(personalData.phone, activeCoords.phone);
-      writeData(personalData.firstName, activeCoords.firstName);
-      writeData(personalData.lastName, activeCoords.lastName);
-      writeData(personalData.city, activeCoords.city);
+      drawTextAt(personalData.firstName, activeCoords.firstName);
+      drawTextAt(personalData.lastName, activeCoords.lastName);
+      drawTextAt(personalData.phone, activeCoords.phone);
+      drawTextAt(personalData.city, activeCoords.city);
+      drawTextAt(personalData.street, activeCoords.street);
       
-      // Render Bank
-      writeData(personalData.bankId, activeCoords.bankId);
-      writeData(personalData.branchId, activeCoords.branchId);
-      writeData(personalData.accountNum, activeCoords.accountNum);
+      // Bank
+      drawTextAt(personalData.bankId, activeCoords.bankId);
+      drawTextAt(personalData.branchId, activeCoords.branchId);
+      drawTextAt(personalData.accountNum, activeCoords.accountNum);
 
-      // Render Tax Maths
-      writeData(computedTaxData.income, activeCoords.income);
-      writeData(computedTaxData.taxPaid, activeCoords.taxPaid);
-      writeData(computedTaxData.employerId, activeCoords.employerId);
+      // Income (Page 1)
+      drawTextAt(computedTaxData.income, activeCoords.income);
+      drawTextAt(computedTaxData.employerId, activeCoords.employerId);
+
+      // Tax (Page 2)
+      drawTextAt(computedTaxData.taxPaid, activeCoords.taxPaid);
+
+      // Checkboxes
+      drawCheckAt(activeCoords.checkIncomeOnly);
+      drawCheckAt(activeCoords.checkRefund);
+
+      const maritalStatus = personalData.maritalStatus || "single";
+      if (maritalStatus === "single") drawCheckAt(activeCoords.checkSingle);
+      else if (maritalStatus === "married") drawCheckAt(activeCoords.checkMarried);
+      else if (maritalStatus === "divorced") drawCheckAt(activeCoords.checkDivorced);
+      else if (maritalStatus === "widowed") drawCheckAt(activeCoords.checkWidowed);
 
     } else {
-      // Fallback Engine if File Missing
       pdfDoc = await PDFDocument.create();
       const page = pdfDoc.addPage([595.28, 841.89]);
-      page.drawText(`CRITICAL ERROR: ${fileName} not physically found in public/ directory!`, { x: 50, y: 800, size: 14, color: rgb(1, 0, 0) });
-      page.drawText(`System cannot map physical coordinates without the baseline image.`, { x: 50, y: 770, size: 12 });
+      page.drawText(`ERROR: Template file ${fileName} not found.`, { x: 50, y: 800, size: 12 });
     }
 
     const pdfBytes = await pdfDoc.save();
@@ -149,12 +181,12 @@ export async function POST(req: NextRequest) {
     return new Response(Buffer.from(pdfBytes), {
       headers: {
         "Content-Type": "application/pdf",
-        "Content-Disposition": `attachment; filename="Official_Form_135_${year}.pdf"`,
+        "Content-Disposition": `attachment; filename="Form_135_${year}.pdf"`,
       },
     });
 
   } catch (error: any) {
-    console.error("PDF Enginer Error:", error);
+    console.error("PDF Engine Error:", error);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 }

@@ -99,6 +99,7 @@ export default function WizardFlow() {
   const [degreeUsed, setDegreeUsed] = useState(false);
   const [soldier, setSoldier] = useState(false);
   const [singleParent, setSingleParent] = useState(false);
+  const [maritalStatus, setMaritalStatus] = useState("single"); // single, married, divorced, widowed
 
   // Advanced Demographics
   const [isOleh, setIsOleh] = useState(false);
@@ -356,7 +357,7 @@ export default function WizardFlow() {
         ...result,
         year: selectedYear,
         personalData: {
-          firstName, lastName, idNumber, city, street, phone, bankId, branchId, accountNum
+          firstName, lastName, idNumber, city, street, phone, bankId, branchId, accountNum, maritalStatus
         },
         maternityAllowance,
         deferredPoint
@@ -492,6 +493,16 @@ export default function WizardFlow() {
                      <div className="flex bg-white/5 rounded-lg p-1 border border-white/10">
                         <button onClick={() => setGender("male")} className={`px-4 py-2 rounded-md transition-colors text-sm font-bold ${gender === "male" ? "bg-white/20 text-white" : "text-neutral-500 hover:text-white"}`}>גבר</button>
                         <button onClick={() => setGender("female")} className={`px-4 py-2 rounded-md transition-colors text-sm font-bold ${gender === "female" ? "bg-white/20 text-white" : "text-neutral-500 hover:text-white"}`}>אישה</button>
+                     </div>
+                  </div>
+
+                  <div className="flex justify-between items-center gap-4">
+                     <div className="flex items-center gap-3"><span className="w-5 h-5 flex items-center justify-center text-neutral-400 text-lg">💑</span><span className="font-semibold">מצב משפחתי</span></div>
+                     <div className="flex bg-white/5 rounded-lg p-1 border border-white/10 flex-wrap justify-end">
+                        <button onClick={() => setMaritalStatus("single")} className={`px-3 py-1.5 rounded-md transition-colors text-xs font-bold ${maritalStatus === "single" ? "bg-white/20 text-white" : "text-neutral-500 hover:text-white"}`}>רווק/ה</button>
+                        <button onClick={() => setMaritalStatus("married")} className={`px-3 py-1.5 rounded-md transition-colors text-xs font-bold ${maritalStatus === "married" ? "bg-white/20 text-white" : "text-neutral-500 hover:text-white"}`}>נשוי/ה</button>
+                        <button onClick={() => setMaritalStatus("divorced")} className={`px-3 py-1.5 rounded-md transition-colors text-xs font-bold ${maritalStatus === "divorced" ? "bg-white/20 text-white" : "text-neutral-500 hover:text-white"}`}>גרוש/ה</button>
+                        <button onClick={() => setMaritalStatus("widowed")} className={`px-3 py-1.5 rounded-md transition-colors text-xs font-bold ${maritalStatus === "widowed" ? "bg-white/20 text-white" : "text-neutral-500 hover:text-white"}`}>אלמן/ה</button>
                      </div>
                   </div>
 

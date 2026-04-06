@@ -1054,6 +1054,84 @@ export default function WizardFlow() {
               </motion.div>
             )}
 
+            {/* STEP 7: PDF PREVIEW */}
+            {step === 7 && pdfPreviewUrl && (
+              <motion.div key="step-pdf-preview" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="w-full text-center space-y-6">
+                <div>
+                  <h2 className="text-3xl font-bold mb-2">תצוגה מקדימה של הטופס</h2>
+                  <p className="text-neutral-400 text-sm">בדקו שהנתונים נכונים. אם הכל תקין — הורידו את הטופס.</p>
+                </div>
+
+                <div className="flex items-center justify-center gap-3 mb-2">
+                  <button onClick={() => setPdfZoom(Math.max(50, pdfZoom - 25))} className="px-3 py-1 bg-white/10 rounded-lg text-sm hover:bg-white/20 transition-colors">−</button>
+                  <span className="text-neutral-400 text-sm font-mono">{pdfZoom}%</span>
+                  <button onClick={() => setPdfZoom(Math.min(200, pdfZoom + 25))} className="px-3 py-1 bg-white/10 rounded-lg text-sm hover:bg-white/20 transition-colors">+</button>
+                </div>
+
+                <div className="bg-white rounded-xl overflow-auto max-h-[60vh] mx-auto" style={{ maxWidth: '800px' }}>
+                  <iframe src={pdfPreviewUrl} style={{ width: `${pdfZoom}%`, height: '80vh', border: 'none', transformOrigin: 'top center' }} title="PDF Preview" />
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
+                  <a href={pdfPreviewUrl} download={`Official_Form_135_${selectedYear}.pdf`} className="px-8 py-3 bg-green-500 hover:bg-green-400 text-white font-bold rounded-xl inline-flex items-center gap-2 transition-colors">
+                    <FileDown className="w-5 h-5" /> הורד את הטופס
+                  </a>
+                  <button onClick={nextStep} className="px-8 py-3 bg-white/10 hover:bg-white/20 text-white font-bold rounded-xl inline-flex items-center gap-2 transition-colors">
+                    מה עכשיו? <ArrowRight className="w-4 h-4 rotate-180" />
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* STEP 8: WHAT NOW — FINAL */}
+            {step === 8 && (
+              <motion.div key="step-final" variants={containerVariants} initial="hidden" animate="visible" exit="exit" className="w-full text-right space-y-6 max-w-2xl mx-auto">
+                <div className="text-center mb-8">
+                  <h2 className="text-3xl font-bold mb-2">🎉 הטופס מוכן — מה עכשיו?</h2>
+                  <p className="text-neutral-400 text-sm">זהו. הטופס שלכם מוכן. עכשיו נותר רק להגיש אותו לרשות המסים.</p>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="bg-black/20 border border-white/5 rounded-2xl p-5">
+                    <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><span className="bg-blue-500/20 text-blue-400 w-7 h-7 rounded-full flex items-center justify-center text-sm font-black">1</span> הגשה דיגיטלית (מומלץ)</h3>
+                    <p className="text-neutral-300 text-sm leading-relaxed">היכנסו לאתר רשות המסים בכתובת <a href="https://www.gov.il/he/service/annual-tax-return" target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline font-bold">gov.il/taxes</a>. היכנסו עם הזדהות חכמה, העלו את הטופס, וחתמו דיגיטלית.</p>
+                  </div>
+
+                  <div className="bg-black/20 border border-white/5 rounded-2xl p-5">
+                    <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><span className="bg-blue-500/20 text-blue-400 w-7 h-7 rounded-full flex items-center justify-center text-sm font-black">2</span> הגשה פיזית (חלופה)</h3>
+                    <p className="text-neutral-300 text-sm leading-relaxed">הדפיסו את הטופס, חתמו בעט, צרפו את כל האסמכתאות (106, צ'ק מבוטל, אישורי ביטוח לאומי) והגישו בסניף רשות המסים הקרוב למקום מגוריכם.</p>
+                  </div>
+
+                  <div className="bg-black/20 border border-white/5 rounded-2xl p-5">
+                    <h3 className="font-bold text-lg mb-3 flex items-center gap-2"><span className="bg-blue-500/20 text-blue-400 w-7 h-7 rounded-full flex items-center justify-center text-sm font-black">3</span> מסמכים נלווים</h3>
+                    <div className="text-neutral-300 text-sm leading-relaxed">
+                      <ul className="space-y-1 list-disc mr-4">
+                        {computeRequiredDocuments().map((doc, idx) => (
+                          <li key={idx}>{doc}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+
+                  <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-5">
+                    <h3 className="font-bold text-lg mb-2 text-green-400 flex items-center gap-2"><CheckCircle2 className="w-5 h-5" /> לוחות זמנים</h3>
+                    <p className="text-neutral-300 text-sm leading-relaxed">ניתן להגיש דוח שנתי עד 6 שנים אחורה. ההחזר מועבר לחשבון הבנק שהזנתם תוך 90 יום עסקים מיום אישור הדוח.</p>
+                  </div>
+                </div>
+
+                <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-6 border-t border-white/10">
+                  {pdfPreviewUrl && (
+                    <a href={pdfPreviewUrl} download={`Official_Form_135_${selectedYear}.pdf`} className="px-6 py-3 bg-green-500 hover:bg-green-400 text-white font-bold rounded-xl inline-flex items-center gap-2 transition-colors">
+                      <FileDown className="w-4 h-4" /> הורד שוב את הטופס
+                    </a>
+                  )}
+                  <a href={whatsappUrl} target="_blank" rel="noopener noreferrer" className="px-6 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-bold flex items-center gap-2 text-sm">
+                    <Share2 className="w-4 h-4" /> שתף ב-WhatsApp
+                  </a>
+                </div>
+              </motion.div>
+            )}
+
           </AnimatePresence>
         </div>
       </div>

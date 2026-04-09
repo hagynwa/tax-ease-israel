@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { generateContentWithRetry } from "@/lib/geminiHelper";
 
 export async function POST(req: NextRequest) {
   try {
@@ -20,7 +21,7 @@ export async function POST(req: NextRequest) {
     const base64Str = Buffer.from(arrayBuffer).toString("base64");
     const mimeType = file.type;
 
-    const response = await ai.models.generateContent({
+    const response = await generateContentWithRetry(ai, {
       model: "gemini-2.5-flash",
       contents: [
         `You are an expert Israeli accountant AI.

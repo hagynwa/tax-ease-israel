@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { GoogleGenAI } from "@google/genai";
+import { generateContentWithRetry } from "@/lib/geminiHelper";
 
 export async function POST(req: NextRequest) {
   try {
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
     const ai = new GoogleGenAI({ apiKey });
     const base64Str = Buffer.from(arrayBuffer).toString("base64");
 
-    const response = await ai.models.generateContent({
+    const response = await generateContentWithRetry(ai, {
       model: "gemini-2.5-flash",
       contents: [
         `You are an expert Israeli OCR bot. The user uploaded an Israeli ID Appendix (ספח תעודת זהות) or ID Card.

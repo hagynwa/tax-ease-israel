@@ -43,9 +43,17 @@ const BASE_COORDS = {
   // --- Section D: Income Table (Page 1) ---
   income:      { page: 0, x: 135, y: 340 },  // Box 158 (Salary)
   employerId:  { page: 0, x: 435, y: 340 },  // Box 150 (Employer ID)
+  insuredInc:  { page: 0, x: 135, y: 300 },  // Box 244 (הכנסה מבוטחת 244)
+  havraa:      { page: 0, x: 135, y: 280 },  // Box 011 (הפחתת הבראה 011)
+
+  // --- Section: Deductions (Page 1 Bottom) ---
+  gemel:       { page: 0, x: 135, y: 150 },  // Box 248 (קופת גמל כעמית שכיר 248)
   
-  // --- Section 55: Tax Paid (Page 2) ---
-  taxPaid:     { page: 1, x: 135, y: 505 },  // Box 042 (Tax withheld)
+  // --- Section Credits/Tax Paid (Page 2) ---
+  lifeIns:     { page: 1, x: 135, y: 650 },  // Box 036 (ביטוח חיים)
+  donations:   { page: 1, x: 135, y: 630 },  // Box 037 (תרומות)
+  pension:     { page: 1, x: 135, y: 610 },  // Box 086 (קצבה כשכיר)
+  taxPaid:     { page: 1, x: 135, y: 565 },  // Box 042 (Tax withheld) - adjusted Y up to test visibility
 
   // --- Checkboxes (Page 1 Top) ---
   checkIncomeOnly: { page: 0, x: 434, y: 770 }, // "הכנסותי בלבד"
@@ -154,12 +162,20 @@ export async function POST(req: NextRequest) {
       drawTextAt(personalData.branchId, activeCoords.branchId);
       drawTextAt(personalData.accountNum, activeCoords.accountNum);
 
-      // Income (Page 1)
       drawTextAt(computedTaxData.income, activeCoords.income);
       drawTextAt(computedTaxData.employerId, activeCoords.employerId);
+      drawTextAt(computedTaxData.insuredIncome, activeCoords.insuredInc);
+      drawTextAt(computedTaxData.havraaReduction, activeCoords.havraa);
+      drawTextAt(computedTaxData.gemelDeduction, activeCoords.gemel);
 
-      // Tax (Page 2)
-      drawTextAt(computedTaxData.taxPaid, activeCoords.taxPaid);
+      // Tax & Credits (Page 2)
+      // Convert taxPaid to positive number string if it exists as taxPaid was sometimes missed
+      const finalTaxPaid = computedTaxData.taxPaid ? String(computedTaxData.taxPaid) : "";
+      drawTextAt(finalTaxPaid, activeCoords.taxPaid);
+      
+      drawTextAt(personalData.lifeInsurance, activeCoords.lifeIns);
+      drawTextAt(personalData.donations, activeCoords.donations);
+      drawTextAt(computedTaxData.pensionKitzba, activeCoords.pension);
 
       // Checkboxes
       drawCheckAt(activeCoords.checkIncomeOnly);

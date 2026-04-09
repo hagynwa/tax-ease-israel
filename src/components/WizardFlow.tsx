@@ -96,8 +96,10 @@ export default function WizardFlow() {
   const [childBirthYears, setChildBirthYears] = useState<number[]>([]);
   const [uploadingId, setUploadingId] = useState(false);
   const [degree, setDegree] = useState<"none" | "bachelor" | "master">("none");
-  const [degreeUsed, setDegreeUsed] = useState(false);
+  const [degreeYear, setDegreeYear] = useState<number | "">("");
+  const [degreeDeferred, setDegreeDeferred] = useState(false);
   const [soldier, setSoldier] = useState(false);
+  const [didReserves, setDidReserves] = useState(false);
   const [singleParent, setSingleParent] = useState(false);
   const [maritalStatus, setMaritalStatus] = useState("single"); // single, married, divorced, widowed
 
@@ -210,13 +212,19 @@ export default function WizardFlow() {
 
     if (singleParent) pts += 1;
     // Note: soldier and isOleh are kept as state variables for future MVP phases
-    // but are not included in calculations until UI toggles are added.
-    if (!degreeUsed) {
-      if (degree === "bachelor") pts += 1;
-      if (degree === "master") pts += 0.5;
+    // Apply degree points conditionally based on graduation year
+    if (degree !== "none" && degreeYear && selectedYear !== null) {
+       const yr = parseInt(String(degreeYear));
+       const startYear = yr + 1 + (degreeDeferred ? 1 : 0);
+       const endYear = startYear + (degree === "bachelor" ? 2 : 1); // rough proxy: up to 3 years for BA, 2 for MA
+       
+       if (selectedYear >= startYear && selectedYear <= endYear) {
+         if (degree === "bachelor") pts += 1;
+         if (degree === "master") pts += 0.5;
+       }
     }
     return pts;
-  }, [gender, childBirthYears, degree, degreeUsed, singleParent, selectedYear, currentYear]);
+  }, [gender, childBirthYears, degree, degreeYear, degreeDeferred, singleParent, selectedYear, currentYear]);
 
   const handleFlowSelect = (selected: FlowType) => {
     setFlow(selected);
@@ -357,7 +365,8 @@ export default function WizardFlow() {
         ...result,
         year: selectedYear,
         personalData: {
-          firstName, lastName, idNumber, city, street, phone, bankId, branchId, accountNum, maritalStatus
+          firstName, lastName, idNumber, city, street, phone, bankId, branchId, accountNum, maritalStatus,
+          donations, lifeInsurance
         },
         maternityAllowance,
         deferredPoint
@@ -401,6 +410,7 @@ export default function WizardFlow() {
     if (paysAlimony) docs.push("גרושים/מזונות: קביעה שיפוטית או פסק דין בדבר גירושין.");
     if (isOleh) docs.push("עולה חדש: העתק תעודת עולה.");
     if (soldier) docs.push("חייל משוחרר: צילום תעודת שחרור מצה\"ל.");
+    if (didReserves) docs.push("מילואים: חובה לצרף אישורי תשלום וימי מילואים מביטוח לאומי או טופס 106 של ביטוח לאומי.");
     if (livesInPeriphery && peripheryPercent > 0) docs.push("יישובי פריפריה (טופס 1312א) ואישור תושבות הרשות המקומית.");
     if (donations > 0) docs.push("תרומות סעיף 46: קבלות מקוריות על שם מבקש ההחזר.");
     if (lifeInsurance > 0) docs.push("ביטוח חיים: אישור מחברת הביטוח על ההפקדות (אישור מס).");
@@ -510,6 +520,13 @@ export default function WizardFlow() {
                      <div className="flex items-center gap-3"><span className="w-5 h-5 flex items-center justify-center text-neutral-400 text-lg">👩‍👦</span><span className="font-semibold">הורה יחיד (חד הורי)</span></div>
                      <button onClick={() => setSingleParent(!singleParent)} className={`w-12 h-6 rounded-full transition-colors relative ${singleParent ? 'bg-blue-500' : 'bg-white/10'}`}><span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${singleParent ? 'translate-x-6' : ''}`} /></button>
                   </div>
+
+                  {gender === "male" && (
+                    <div className="flex justify-between items-center gap-4">
+                       <div className="flex items-center gap-3"><span className="w-5 h-5 flex items-center justify-center text-neutral-400 text-lg">🎖️</span><span className="font-semibold">שירות מילואים</span></div>
+                       <button onClick={() => setDidReserves(!didReserves)} className={`w-12 h-6 rounded-full transition-colors relative ${didReserves ? 'bg-blue-500' : 'bg-white/10'}`}><span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${didReserves ? 'translate-x-6' : ''}`} /></button>
+                    </div>
+                  )}
 
                   {/* CHILDREN */}
                   <div className="pt-4 border-t border-white/10">
@@ -680,6 +697,29 @@ export default function WizardFlow() {
                         <button onClick={() => setDegree("bachelor")} className={`py-2 rounded-lg border transition-colors text-sm font-bold ${degree === "bachelor" ? "bg-blue-500/20 border-blue-500/50 text-blue-400" : "bg-white/5 border-white/10 text-neutral-400 hover:text-white"}`}>תואר ראשון</button>
                         <button onClick={() => setDegree("master")} className={`py-2 rounded-lg border transition-colors text-sm font-bold ${degree === "master" ? "bg-blue-500/20 border-blue-500/50 text-blue-400" : "bg-white/5 border-white/10 text-neutral-400 hover:text-white"}`}>תואר שני</button>
                      </div>
+                     
+                     {degree !== "none" && (
+                        <div className="bg-blue-500/10 border border-blue-500/20 p-4 rounded-xl mt-3 space-y-4">
+                          <div>
+                            <label className="text-sm text-neutral-300 block mb-2 font-medium">באיזו שנה סיימת את התואר/הזכאות?</label>
+                            <input type="number" value={degreeYear} onChange={(e) => setDegreeYear(parseInt(e.target.value) || "")} placeholder="לדוגמה: 2021" className="w-full bg-black/50 border border-blue-500/30 rounded-lg px-3 py-2 outline-none text-white font-bold text-right" />
+                          </div>
+                          
+                          {degreeYear && (
+                            <div className="text-sm bg-black/30 p-3 rounded-lg text-neutral-400 leading-relaxed text-right">
+                              נקודות הזיכוי ניתנות החל מהשנה שאחרי סיום התואר (עד 3 שנים עבור תואר ראשון). 
+                              ניתן לדחות את תחילת המימוש בשנה אחת נוספת.
+                            </div>
+                          )}
+                          
+                          {degreeYear && (
+                            <div className="flex justify-between items-center gap-4 text-sm mt-2">
+                               <span className="font-semibold">האם בחרת לדחות את המימוש בשנה?</span>
+                               <button onClick={() => setDegreeDeferred(!degreeDeferred)} className={`w-12 h-6 rounded-full transition-colors relative flex-shrink-0 ${degreeDeferred ? 'bg-blue-500' : 'bg-white/10'}`}><span className={`absolute top-1 left-1 w-4 h-4 bg-white rounded-full transition-transform ${degreeDeferred ? 'translate-x-6' : ''}`} /></button>
+                            </div>
+                          )}
+                        </div>
+                     )}
                   </div>
 
                   <div className="space-y-4 pt-2">

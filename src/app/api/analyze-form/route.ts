@@ -56,7 +56,11 @@ export async function POST(req: NextRequest) {
               "income": number (total from section 158 or 172 sum),
               "taxPaid": number (amount in section 042),
               "monthsWorked": number (how many months this employee worked according to the form),
-              "maternityAllowanceDetected": number (if this is a Bituach Leumi form, extract the total "דמי לידה" amount)
+              "maternityAllowanceDetected": number (if this is a Bituach Leumi form, extract the total "דמי לידה" amount),
+              "insuredIncome": number (income insured box 244 or 245, 0 if not found),
+              "gemelDeduction": number (deduction to provident fund as employee box 248 or 249, 0 if not found),
+              "havraaReduction": number (convalescence pay reduction box 011 or 012, 0 if not found),
+              "pensionKitzba": number (pension as employee box 086 or 045, 0 if not found)
             }
             Return exactly and ONLY valid JSON without markdown wrapping or backticks.`,
           {

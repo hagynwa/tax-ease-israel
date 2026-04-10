@@ -141,6 +141,7 @@ export default function WizardFlow() {
   const [pdfPreviewUrl, setPdfPreviewUrl] = useState<string | null>(null);
   const [pdfZoom, setPdfZoom] = useState(100);
   const [bankSearch, setBankSearch] = useState("");
+  const [docUploadStatus, setDocUploadStatus] = useState<Record<string, boolean>>({});
   const [branchSearch, setBranchSearch] = useState("");
   const [showBankDropdown, setShowBankDropdown] = useState(false);
   const [showBranchDropdown, setShowBranchDropdown] = useState(false);
@@ -824,15 +825,41 @@ export default function WizardFlow() {
                 )}
 
                 {/* Upload area */}
-                <div className="relative group cursor-pointer max-w-lg mx-auto">
-                  <input type="file" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" accept="image/*,.pdf" />
-                  <div className={`border-2 border-dashed rounded-3xl p-8 sm:p-10 flex flex-col items-center justify-center transition-all duration-300 ${uploadingDoc ? 'border-blue-500 bg-blue-500/5' : 'border-white/20 bg-white/5'}`}>
-                    {uploadingDoc ? (
-                      <><Loader2 className="w-12 h-12 text-blue-500 mb-4 animate-spin" /><h3 className="text-lg sm:text-xl font-semibold mb-1">הבינה המלאכותית מנתחת...</h3></>
-                    ) : (
-                      <><UploadCloud className="w-12 h-12 text-neutral-400 mb-4" /><h3 className="text-lg sm:text-xl font-semibold mb-1">{uploadedForms.length > 0 ? 'הוסף טופס 106 נוסף' : 'העלאת קובץ'}</h3><p className="text-xs text-neutral-500">ניתן להעלות מספר טפסי 106 ממעסיקים שונים</p></>
-                    )}
-                  </div>
+                <div className="space-y-4 max-w-lg mx-auto">
+                  {computeRequiredDocuments().map((doc, idx) => {
+                    const is106 = doc.includes("106 מקורי");
+                    if (is106) {
+                      return (
+                        <div key={idx} className="relative group cursor-pointer w-full">
+                          <input type="file" onChange={handleFileUpload} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" accept="image/*,.pdf" />
+                          <div className={`border-2 border-dashed rounded-3xl p-6 sm:p-8 flex flex-col items-center justify-center transition-all duration-300 ${uploadingDoc ? 'border-blue-500 bg-blue-500/5' : 'border-white/20 bg-white/5 hover:border-blue-500/50 hover:bg-white/10'}`}>
+                            {uploadingDoc ? (
+                              <><Loader2 className="w-8 h-8 text-blue-500 mb-3 animate-spin" /><h3 className="text-lg font-semibold mb-1">מנתח אוטומטית...</h3></>
+                            ) : (
+                              <><UploadCloud className="w-8 h-8 text-neutral-400 mb-3" /><h3 className="text-lg font-semibold mb-1 text-center">{doc}</h3><p className="text-xs text-neutral-500">יוזן אוטומטית למערכת (OCR)</p></>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    } else {
+                      const isUploaded = docUploadStatus[doc];
+                      return (
+                        <div key={idx} className="relative group cursor-pointer w-full">
+                          <input type="file" onChange={(e) => {
+                            if (e.target.files?.[0]) setDocUploadStatus(prev => ({...prev, [doc]: true}));
+                          }} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20" accept="image/*,.pdf" />
+                          <div className={`border rounded-2xl p-4 flex items-center justify-between transition-all duration-300 ${isUploaded ? 'bg-green-500/10 border-green-500/30' : 'bg-black/40 border-white/10 hover:border-white/30'}`}>
+                            <div className="flex items-center gap-3 pr-2">
+                              {isUploaded ? <CheckCircle2 className="w-6 h-6 text-green-400" /> : <UploadCloud className="w-6 h-6 text-neutral-500" />}
+                              <span className={`text-sm font-medium leading-tight ${isUploaded ? 'text-green-300' : 'text-neutral-300'}`}>{doc}</span>
+                            </div>
+                            {!isUploaded && <span className="text-[10px] bg-white/10 px-2 py-1 rounded text-neutral-400 whitespace-nowrap ml-2">בחר קובץ</span>}
+                            {isUploaded && <span className="text-[10px] bg-green-500/20 text-green-400 px-2 py-1 rounded whitespace-nowrap ml-2">הועלה בהצלחה</span>}
+                          </div>
+                        </div>
+                      );
+                    }
+                  })}
                 </div>
 
                 {uploadedForms.length > 0 && (
